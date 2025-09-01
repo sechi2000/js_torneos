@@ -15,8 +15,8 @@ type Player = {
   }
 }
 
-const IG_HANDLE = 'https://instagram.com/j_and_s_padel' // ⬅️ cambia por tu IG real
-const INSCRIPCION_LINK = 'https://forms.gle/tu-formulario' // ⬅️ pega aquí tu Google Form
+const IG_HANDLE = 'https://www.instagram.com/js_torneos/' // ⬅️ cambia por tu IG real
+const INSCRIPCION_LINK = 'https://forms.gle/AQ6cqBRLS16XkjhbA' // ⬅️ pega aquí tu Google Form
 
 const GALLERY: { url: string; title: string; date?: string }[] = [
   { url: 'https://images.unsplash.com/photo-1517649763962-0c623066013b', title: 'Finales Pozo 01', date: '2025-08-20' },
@@ -30,8 +30,8 @@ const PLAYERS_SAMPLE: Player[] = [
     name: 'Alejandro Sechi',
     photo: 'https://i.pravatar.cc/200?img=5',
     level: '3.5',
-    club: 'Municipal Centro',
-    ig: 'https://instagram.com/ale_sechi',
+    club: 'RFET',
+    ig: 'https://www.instagram.com/secci_tennis/',
     stats: { pozosJugados: 6, victorias: 3, juegosGanados: 46, juegosPerdidos: 39 },
   },
   {
@@ -39,8 +39,8 @@ const PLAYERS_SAMPLE: Player[] = [
     name: 'Julia',
     photo: 'https://i.pravatar.cc/200?img=15',
     level: '3.0',
-    club: 'Municipal Norte',
-    ig: 'https://instagram.com/julia',
+    club: 'None',
+    ig: 'https://www.instagram.com/juls_es_00/',
     stats: { pozosJugados: 5, victorias: 2, juegosGanados: 40, juegosPerdidos: 35 },
   },
   {
