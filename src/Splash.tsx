@@ -85,84 +85,20 @@ export default function Splash({ onEnter }: { onEnter: () => void }) {
     const tick = () => {
       ctx.resetTransform()
       ctx.scale(dpr, dpr)
+
+      // ==== FONDO PISTA DE PÁDEL ====
       ctx.clearRect(0, 0, cvs.clientWidth, cvs.clientHeight)
-      const grd = ctx.createLinearGradient(0, 0, cvs.clientWidth, cvs.clientHeight)
-      grd.addColorStop(0, '#ecfeff')
-      grd.addColorStop(1, '#f5f3ff')
-      ctx.fillStyle = grd
+      ctx.fillStyle = '#15803d' // verde césped
       ctx.fillRect(0, 0, cvs.clientWidth, cvs.clientHeight)
+
+      ctx.strokeStyle = '#ffffff'
+      ctx.lineWidth = 4
+      ctx.strokeRect(40, 40, cvs.clientWidth - 80, cvs.clientHeight - 80)
+      ctx.beginPath()
+      ctx.moveTo(cvs.clientWidth / 2, 40)
+      ctx.lineTo(cvs.clientWidth / 2, cvs.clientHeight - 40)
+      ctx.stroke()
+      // ==============================
 
       const paddleR = 30
       const { x: mx, y: my } = mouse.current
-
-      for (const b of balls.current) {
-        b.x += b.vx
-        b.y += b.vy
-        if (b.x - b.r < 0) { b.x = b.r; b.vx *= -1 }
-        if (b.x + b.r > cvs.clientWidth) { b.x = cvs.clientWidth - b.r; b.vx *= -1 }
-        if (b.y - b.r < 0) { b.y = b.r; b.vy *= -1 }
-        if (b.y + b.r > cvs.clientHeight) { b.y = cvs.clientHeight - b.r; b.vy *= -1 }
-
-        const dx = b.x - mx
-        const dy = b.y - my
-        const dist = Math.hypot(dx, dy)
-        if (dist < b.r + paddleR) {
-          const nx = dx / (dist || 1)
-          const ny = dy / (dist || 1)
-          const push = 2.6
-          b.vx = nx * push + rand(-0.25, 0.25)
-          b.vy = ny * push + rand(-0.25, 0.25)
-          const overlap = (b.r + paddleR) - dist
-          if (overlap > 0) { b.x += nx * overlap; b.y += ny * overlap }
-          playPop()
-          if (navigator.vibrate) navigator.vibrate(8)
-        }
-        b.vx *= 0.995; b.vy *= 0.995
-      }
-
-      for (const b of balls.current) {
-        ctx.beginPath()
-        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2)
-        ctx.fillStyle = '#fde047'
-        ctx.fill()
-        ctx.lineWidth = 2
-        ctx.strokeStyle = '#facc15'
-        ctx.stroke()
-      }
-
-      if (loadedImg && (mx > 0 && my > 0)) {
-        const w = 64, h = 64
-        ctx.save()
-        const scale = hoverBtn ? 1.08 : 1
-        ctx.translate(mx, my)
-        ctx.scale(scale, scale)
-        ctx.drawImage(loadedImg, -w/2, -h/2, w, h)
-        ctx.restore()
-      }
-      raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [loadedImg, hoverBtn])
-
-  return (
-    <div className="relative min-h-screen w-full overflow-hidden" style={{ cursor: isTouch ? 'default' : 'none' }}>
-      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block"/>
-      <div className="relative z-10 pointer-events-none select-none flex flex-col items-center justify-center text-center min-h-screen p-6">
-        <h1 className="text-4xl md:text-6xl font-semibold tracking-tight bg-gradient-to-r from-cyan-500 to-violet-500 bg-clip-text text-transparent">J & S Padel</h1>
-        <p className="mt-3 text-slate-600 max-w-xl">Mueve la pala y juega con las pelotas. ¡Luego entra a la web!</p>
-        <div className="absolute bottom-10 left-0 right-0 flex justify-center">
-          <button
-            onMouseEnter={() => setHoverBtn(true)}
-            onMouseLeave={() => setHoverBtn(false)}
-            onTouchStart={() => setHoverBtn(true)}
-            onTouchEnd={() => setHoverBtn(false)}
-            onClick={onEnter}
-            className="pointer-events-auto inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white/80 backdrop-blur px-7 py-3 text-sm shadow transition"
-            style={{ transform: hoverBtn ? 'translateY(-2px) scale(1.03)' : 'translateY(0) scale(1)' }}
-          >Entrar a la web</button>
-        </div>
-      </div>
-    </div>
-  )
-}
