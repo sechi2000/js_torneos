@@ -1,45 +1,31 @@
 import React, { useEffect, useRef, useState } from 'react'
 
-const BALL_COUNT = 16
-const BALL_MIN_R = 8
-const BALL_MAX_R = 16
-const SPEED = 1.0
+type Node = { x: number; y: number; vx: number; vy: number }
+
+const NODES = 80
+const SPEED = 0.35
+const LINK_DIST = 130
+const MOUSE_PULL = 0.04
+const HUE_SPEED = 0.12
 
 function rand(min: number, max: number) { return Math.random() * (max - min) + min }
 
-const POP_BASE64 =
-  'data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQAAACAAAC4AAAClbW1tcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
-
 export default function Splash({ onEnter }: { onEnter: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const [loadedImg, setLoadedImg] = useState<HTMLImageElement | null>(null)
+  const nodes = useRef<Node[]>([])
+  const mouse = useRef({ x: -9999, y: -9999 })
+  const hue = useRef(210)
+
   const [hoverBtn, setHoverBtn] = useState(false)
   const [isTouch, setIsTouch] = useState(false)
-  const mouse = useRef({ x: -9999, y: -9999 })
-  const balls = useRef<{ x: number; y: number; r: number; vx: number; vy: number }[]>([])
-  const popRef = useRef<HTMLAudioElement | null>(null)
-
-  useEffect(() => {
-    const img = new Image()
-    img.src = '/paddle.svg'
-    img.onload = () => setLoadedImg(img)
-    const a = new Audio(POP_BASE64)
-    a.preload = 'auto'
-    popRef.current = a
-  }, [])
-
-  const playPop = () => {
-    const base = popRef.current
-    if (!base) return
-    const a = base.cloneNode(true) as HTMLAudioElement
-    a.volume = 0.35
-    void a.play().catch(() => {})
-  }
 
   useEffect(() => {
     const cvs = canvasRef.current
     if (!cvs) return
-    const dpr = Math.max(1, window.devicePixelRatio || 1)
+    const ctx = cvs.getContext('2d')
+    if (!ctx) return
+
+    const dpr = Math.max(1, (window.devicePixelRatio || 1))
     const resize = () => {
       cvs.width = Math.floor(cvs.clientWidth * dpr)
       cvs.height = Math.floor(cvs.clientHeight * dpr)
@@ -47,110 +33,116 @@ export default function Splash({ onEnter }: { onEnter: () => void }) {
     resize()
     window.addEventListener('resize', resize)
 
-    balls.current = Array.from({ length: BALL_COUNT }).map(() => ({
-      x: rand(60, cvs.clientWidth - 60),
-      y: rand(60, cvs.clientHeight - 60),
-      r: rand(BALL_MIN_R, BALL_MAX_R),
+    nodes.current = Array.from({ length: NODES }).map(() => ({
+      x: rand(0, cvs.clientWidth),
+      y: rand(0, cvs.clientHeight),
       vx: rand(-SPEED, SPEED),
       vy: rand(-SPEED, SPEED),
     }))
 
     const updateMouse = (clientX: number, clientY: number) => {
       const rect = cvs.getBoundingClientRect()
-      mouse.current.x = (clientX - rect.left)
-      mouse.current.y = (clientY - rect.top)
+      mouse.current.x = (clientX - rect.left) * dpr
+      mouse.current.y = (clientY - rect.top) * dpr
     }
-
     const onMove = (e: MouseEvent) => updateMouse(e.clientX, e.clientY)
     const onLeave = () => { mouse.current.x = -9999; mouse.current.y = -9999 }
-
-    const onTouchStart = (e: TouchEvent) => {
+    const onTouchStart = (e: any) => {
       setIsTouch(true)
-      const t = e.touches[0]
+      const t = e.touches?.[0]
       if (t) updateMouse(t.clientX, t.clientY)
     }
-    const onTouchMove = (e: TouchEvent) => {
-      const t = e.touches[0]
+    const onTouchMove = (e: any) => {
+      const t = e.touches?.[0]
       if (t) updateMouse(t.clientX, t.clientY)
     }
 
     cvs.addEventListener('mousemove', onMove)
     cvs.addEventListener('mouseleave', onLeave)
-    cvs.addEventListener('touchstart', onTouchStart, { passive: true })
-    cvs.addEventListener('touchmove', onTouchMove, { passive: true })
+    cvs.addEventListener('touchstart', onTouchStart, { passive: true } as any)
+    cvs.addEventListener('touchmove', onTouchMove, { passive: true } as any)
 
     let raf = 0
-    const ctx = cvs.getContext('2d')!
-
     const tick = () => {
-      ctx.resetTransform()
-      ctx.scale(dpr, dpr)
-      ctx.clearRect(0, 0, cvs.clientWidth, cvs.clientHeight)
-      const grd = ctx.createLinearGradient(0, 0, cvs.clientWidth, cvs.clientHeight)
-      grd.addColorStop(0, '#ecfeff')
-      grd.addColorStop(1, '#f5f3ff')
-      ctx.fillStyle = grd
-      ctx.fillRect(0, 0, cvs.clientWidth, cvs.clientHeight)
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
 
-      const paddleR = 30
-      const { x: mx, y: my } = mouse.current
+      hue.current = (hue.current + HUE_SPEED) % 360
+      const w = cvs.width, h = cvs.height
+      const g = ctx.createLinearGradient(0, 0, w, h)
+      g.addColorStop(0, `hsl(${hue.current}, 75%, 9%)`)
+      g.addColorStop(1, `hsl(${(hue.current + 70) % 360}, 75%, 12%)`)
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, w, h)
 
-      for (const b of balls.current) {
-        b.x += b.vx
-        b.y += b.vy
-        if (b.x - b.r < 0) { b.x = b.r; b.vx *= -1 }
-        if (b.x + b.r > cvs.clientWidth) { b.x = cvs.clientWidth - b.r; b.vx *= -1 }
-        if (b.y - b.r < 0) { b.y = b.r; b.vy *= -1 }
-        if (b.y + b.r > cvs.clientHeight) { b.y = cvs.clientHeight - b.r; b.vy *= -1 }
-
-        const dx = b.x - mx
-        const dy = b.y - my
+      const mx = mouse.current.x, my = mouse.current.y
+      for (const n of nodes.current) {
+        const dx = mx - n.x, dy = my - n.y
         const dist = Math.hypot(dx, dy)
-        if (dist < b.r + paddleR) {
-          const nx = dx / (dist || 1)
-          const ny = dy / (dist || 1)
-          const push = 2.6
-          b.vx = nx * push + rand(-0.25, 0.25)
-          b.vy = ny * push + rand(-0.25, 0.25)
-          const overlap = (b.r + paddleR) - dist
-          if (overlap > 0) { b.x += nx * overlap; b.y += ny * overlap }
-          playPop()
-          if (navigator.vibrate) navigator.vibrate(8)
+        if (dist < 500) {
+          n.vx += (dx / (dist || 1)) * MOUSE_PULL
+          n.vy += (dy / (dist || 1)) * MOUSE_PULL
         }
-        b.vx *= 0.995; b.vy *= 0.995
+        n.x += n.vx
+        n.y += n.vy
+        n.vx *= 0.995; n.vy *= 0.995
+        if (n.x < 0) { n.x = 0; n.vx *= -1 }
+        if (n.y < 0) { n.y = 0; n.vy *= -1 }
+        if (n.x > w) { n.x = w; n.vx *= -1 }
+        if (n.y > h) { n.y = h; n.vy *= -1 }
       }
 
-      for (const b of balls.current) {
+      for (let i = 0; i < nodes.current.length; i++) {
+        const a = nodes.current[i]
         ctx.beginPath()
-        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2)
-        ctx.fillStyle = '#fde047'
+        ctx.arc(a.x, a.y, 2.2, 0, Math.PI * 2)
+        ctx.fillStyle = 'rgba(255,255,255,0.9)'
         ctx.fill()
-        ctx.lineWidth = 2
-        ctx.strokeStyle = '#facc15'
-        ctx.stroke()
+
+        for (let j = i + 1; j < nodes.current.length; j++) {
+          const b = nodes.current[j]
+          const dx = a.x - b.x, dy = a.y - b.y
+          const d2 = dx*dx + dy*dy
+          if (d2 < LINK_DIST * LINK_DIST) {
+            const alpha = 1 - Math.sqrt(d2) / LINK_DIST
+            ctx.strokeStyle = `rgba(168, 85, 247, ${alpha * 0.6})`
+            ctx.lineWidth = 1
+            ctx.beginPath()
+            ctx.moveTo(a.x, a.y)
+            ctx.lineTo(b.x, b.y)
+            ctx.stroke()
+          }
+        }
       }
 
-      if (loadedImg && (mx > 0 && my > 0)) {
-        const w = 64, h = 64
-        ctx.save()
-        const scale = hoverBtn ? 1.08 : 1
-        ctx.translate(mx, my)
-        ctx.scale(scale, scale)
-        ctx.drawImage(loadedImg, -w/2, -h/2, w, h)
-        ctx.restore()
+      if (mx > 0 && my > 0) {
+        const r = 70
+        const radial = ctx.createRadialGradient(mx, my, 0, mx, my, r)
+        radial.addColorStop(0, 'rgba(34,211,238,0.35)')
+        radial.addColorStop(1, 'rgba(34,211,238,0)')
+        ctx.fillStyle = radial
+        ctx.beginPath()
+        ctx.arc(mx, my, r, 0, Math.PI * 2)
+        ctx.fill()
       }
+
       raf = requestAnimationFrame(tick)
     }
+
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [loadedImg, hoverBtn])
+  }, [])
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden" style={{ cursor: isTouch ? 'default' : 'none' }}>
-      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block"/>
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block" />
       <div className="relative z-10 pointer-events-none select-none flex flex-col items-center justify-center text-center min-h-screen p-6">
-        <h1 className="text-4xl md:text-6xl font-semibold tracking-tight bg-gradient-to-r from-cyan-500 to-violet-500 bg-clip-text text-transparent">J & S Padel</h1>
-        <p className="mt-3 text-slate-600 max-w-xl">Mueve la pala y juega con las pelotas. ¡Luego entra a la web!</p>
+        <h1 className="text-4xl md:text-6xl font-semibold tracking-tight bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent">
+          J & S Padel
+        </h1>
+        <p className="mt-3 text-white/80 max-w-xl">
+          Conexiones, energía y ritmo. Entra y juega nuestros pozos.
+        </p>
+
         <div className="absolute bottom-10 left-0 right-0 flex justify-center">
           <button
             onMouseEnter={() => setHoverBtn(true)}
@@ -158,9 +150,11 @@ export default function Splash({ onEnter }: { onEnter: () => void }) {
             onTouchStart={() => setHoverBtn(true)}
             onTouchEnd={() => setHoverBtn(false)}
             onClick={onEnter}
-            className="pointer-events-auto inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white/80 backdrop-blur px-7 py-3 text-sm shadow transition"
+            className="pointer-events-auto inline-flex items-center gap-2 rounded-2xl border border-white/30 bg-white/10 text-white backdrop-blur px-7 py-3 text-sm shadow-lg transition"
             style={{ transform: hoverBtn ? 'translateY(-2px) scale(1.03)' : 'translateY(0) scale(1)' }}
-          >Entrar a la web</button>
+          >
+            Entrar a la web
+          </button>
         </div>
       </div>
     </div>
