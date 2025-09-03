@@ -1,29 +1,54 @@
-import React, { useMemo, useState } from 'react'
+import React from 'react'
+import { fetchCSV } from './utils/csv'
 
 /* ─────────────────────────────────────────────────────────
-   Config rápida (cámbialo luego a tus enlaces reales)
+   Tipos y configuración
    ───────────────────────────────────────────────────────── */
-const FORM_URL = 'https://tu-formulario-de-inscripcion.com' // <-- pon aquí tu form real
-const IG_URL   = 'https://instagram.com/tu_cuenta_ig'       // <-- pon aquí tu IG
-
-// Galería de ejemplo: sustituye por URLs reales o por un fetch si quieres
-const GALLERY: { src: string; alt: string }[] = [
-  { src: 'https://images.unsplash.com/photo-1513245543132-31f507417b26?q=80&w=800&auto=format&fit=crop', alt: 'Pozo 1' },
-  { src: 'https://images.unsplash.com/photo-1520975922192-24cd97bca3d5?q=80&w=800&auto=format&fit=crop', alt: 'Pozo 2' },
-  { src: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=800&auto=format&fit=crop', alt: 'Pozo 3' },
-  { src: 'https://images.unsplash.com/photo-1552074280-9d5c3b0a3f6a?q=80&w=800&auto=format&fit=crop', alt: 'Pozo 4' },
-  { src: 'https://images.unsplash.com/photo-1508672019048-805c876b67e2?q=80&w=800&auto=format&fit=crop', alt: 'Pozo 5' },
-  { src: 'https://images.unsplash.com/photo-1530023367847-a683933f417f?q=80&w=800&auto=format&fit=crop', alt: 'Pozo 6' },
-]
-
-// Jugadores de ejemplo: luego lo conectamos a Google Sheet/CSV
 type Player = { id: string; name: string; level: string; club?: string; ig?: string; photo?: string }
-const SAMPLE_PLAYERS: Player[] = [
-  { id: 'p1', name: 'María López', level: 'Intermedio', club: 'Municipal', ig: '@marialopez', photo: 'https://i.pravatar.cc/100?img=5' },
-  { id: 'p2', name: 'Carlos Díaz', level: 'Avanzado', club: 'Centro', ig: '@carlosdz', photo: 'https://i.pravatar.cc/100?img=12' },
-  { id: 'p3', name: 'Ana Ruiz', level: 'Inicial', club: 'Norte', ig: '@anaruiz', photo: 'https://i.pravatar.cc/100?img=32' },
-  { id: 'p4', name: 'Javi Pérez', level: 'Intermedio', club: 'Sur', ig: '@javiperez', photo: 'https://i.pravatar.cc/100?img=14' },
+
+const FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSepjrGlEfJqq8Tg4vFsqw7Twh_TbAvApchG89qXU4UktgYihw/viewform?usp=header'
+const IG_URL   = 'https://www.instagram.com/js_torneos/'
+
+const GALLERY: { src: string; alt: string }[] = [
+  { src: 'https://images.unsplash.com/photo-1513245543132-31f507417b26?q=80&auto=format&fit=crop', alt: 'Pozo 1' },
+  { src: 'https://images.unsplash.com/photo-1520975922192-24cd97bca3d5?q=80&auto=format&fit=crop', alt: 'Pozo 2' },
+  { src: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&auto=format&fit=crop', alt: 'Pozo 3' },
+  { src: 'https://images.unsplash.com/photo-1552074280-9d5c3b0a3f6a?q=80&auto=format&fit=crop', alt: 'Pozo 4' },
+  { src: 'https://images.unsplash.com/photo-1508672019048-805c876b67e2?q=80&auto=format&fit=crop', alt: 'Pozo 5' },
+  { src: 'https://images.unsplash.com/photo-1530023367847-a683933f417f?q=80&auto=format&fit=crop', alt: 'Pozo 6' },
 ]
+
+/* ─────────────────────────────────────────────────────────
+   Hook: carga jugadores desde /public/players.csv
+   ───────────────────────────────────────────────────────── */
+function usePlayers() {
+  const [players, setPlayers] = React.useState<Player[]>([])
+
+  React.useEffect(() => {
+    const load = async () => {
+      try {
+        // Lee el CSV empaquetado en /public
+        const url = `${import.meta.env.BASE_URL}players.csv`
+        const data = await fetchCSV(url)
+        const mapped = data.map((r: any, idx: number): Player => ({
+          id: r.id || String(idx),
+          name: r.name || r.nombre || 'Jugador',
+          level: r.level || r.nivel || '',
+          club: r.club || '',
+          ig: r.ig || r.instagram || '',
+          photo: r.photo || r.foto || '',
+        }))
+        setPlayers(mapped)
+      } catch (err) {
+        console.error('Error cargando CSV', err)
+        setPlayers([])
+      }
+    }
+    load()
+  }, [])
+
+  return players
+}
 
 /* ─────────────────────────────────────────────────────────
    UI
@@ -135,7 +160,7 @@ function Galeria() {
         <div className="mt-6 grid grid-cols-2 md:grid-cols-3 gap-3">
           {GALLERY.map((g, i) => (
             <a key={i} href={g.src} target="_blank" className="group block rounded-2xl overflow-hidden border border-slate-200">
-              <img src={g.src} alt={g.alt} className="w-full h-40 md:h-48 object-cover group-hover:scale-[1.02] transition" />
+              <img src={g.src} alt={g.alt} className="w-full h-40 md:h-48 object-cover group-hover:scale-[1.02] transition" loading="lazy" />
             </a>
           ))}
         </div>
@@ -144,17 +169,17 @@ function Galeria() {
   )
 }
 
-function Jugadores() {
-  const [q, setQ] = useState('')
-  const list = useMemo(() => {
+function Jugadores({ players }: { players: Player[] }) {
+  const [q, setQ] = React.useState('')
+  const list = React.useMemo(() => {
     const t = q.trim().toLowerCase()
-    if (!t) return SAMPLE_PLAYERS
-    return SAMPLE_PLAYERS.filter(p =>
+    if (!t) return players
+    return players.filter(p =>
       p.name.toLowerCase().includes(t) ||
       (p.level?.toLowerCase().includes(t)) ||
       (p.club?.toLowerCase().includes(t))
     )
-  }, [q])
+  }, [q, players])
 
   return (
     <section id="jugadores" className="border-t border-slate-200">
@@ -205,7 +230,12 @@ function Footer() {
   )
 }
 
+/* ─────────────────────────────────────────────────────────
+   App
+   ───────────────────────────────────────────────────────── */
 export default function App() {
+  const players = usePlayers()
+
   return (
     <div className="bg-white text-slate-900">
       <Nav />
@@ -213,7 +243,7 @@ export default function App() {
       <Inscripcion />
       <Redes />
       <Galeria />
-      <Jugadores />
+      <Jugadores players={players} />
       <Footer />
     </div>
   )
