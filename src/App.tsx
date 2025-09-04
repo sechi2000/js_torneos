@@ -2,7 +2,7 @@ import React from 'react'
 import { fetchCSV } from './utils/csv'
 
 /* ─────────────────────────────────────────────────────────
-   Scroll extras (barra progreso, reveal, parallax)
+   SCROLL EXTRAS: barra progreso, reveal, parallax
    ───────────────────────────────────────────────────────── */
 function ScrollProgress() {
   const [p, setP] = React.useState(0)
@@ -18,7 +18,7 @@ function ScrollProgress() {
     return () => { window.removeEventListener('scroll', f); window.removeEventListener('resize', f) }
   }, [])
   return (
-    <div className="fixed inset-x-0 top-0 z-50 h-0.5 bg-transparent">
+    <div className="fixed inset-x-0 top-0 z-[60] h-0.5 bg-transparent">
       <div
         className="h-full bg-gradient-to-r from-cyan-500 to-violet-500 transition-[width] duration-150 ease-out"
         style={{ width: `${p * 100}%` }}
@@ -90,15 +90,213 @@ function ParallaxDecor() {
 }
 
 /* ─────────────────────────────────────────────────────────
+   EPIC MODE: Partículas + Botón magnético + Confetti
+   ───────────────────────────────────────────────────────── */
+// Campo de partículas reactivo al cursor (canvas)
+function ParticleField() {
+  const ref = React.useRef<HTMLCanvasElement>(null)
+  const mouse = React.useRef({ x: 0, y: 0, has: false })
+  React.useEffect(() => {
+    const canvas = ref.current!
+    const ctx = canvas.getContext('2d')!
+    let w = canvas.width = canvas.offsetWidth
+    let h = canvas.height = canvas.offsetHeight
+
+    // partículitas
+    const COUNT = Math.floor((w * h) / 18000) + 60
+    const P = Array.from({ length: COUNT }, () => ({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: (Math.random() - 0.5) * 0.3,
+      r: Math.random() * 1.6 + 0.6,
+    }))
+
+    const onMouse = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect()
+      mouse.current.x = e.clientX - rect.left
+      mouse.current.y = e.clientY - rect.top
+      mouse.current.has = true
+    }
+    const onLeave = () => { mouse.current.has = false }
+    const onResize = () => {
+      w = canvas.width = canvas.offsetWidth
+      h = canvas.height = canvas.offsetHeight
+    }
+
+    canvas.addEventListener('mousemove', onMouse)
+    canvas.addEventListener('mouseleave', onLeave)
+    window.addEventListener('resize', onResize)
+
+    let raf = 0
+    const loop = () => {
+      ctx.clearRect(0, 0, w, h)
+
+      // fondo sutil
+      const g = ctx.createLinearGradient(0, 0, w, h)
+      g.addColorStop(0, 'rgba(14,165,233,0.04)')
+      g.addColorStop(1, 'rgba(139,92,246,0.04)')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, w, h)
+
+      // dibuja puntos
+      for (const p of P) {
+        // atracción/repulsión suave
+        if (mouse.current.has) {
+          const dx = p.x - mouse.current.x
+          const dy = p.y - mouse.current.y
+          const d2 = dx * dx + dy * dy
+          const f = Math.min(60_000 / (d2 + 1), 0.8) // límite
+          p.vx += (dx / Math.sqrt(d2 + 1)) * f * -0.006
+          p.vy += (dy / Math.sqrt(d2 + 1)) * f * -0.006
+        }
+
+        p.x += p.vx; p.y += p.vy
+        // “rebote” suave en bordes
+        if (p.x < 0 || p.x > w) p.vx *= -1
+        if (p.y < 0 || p.y > h) p.vy *= -1
+
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
+        ctx.fillStyle = 'rgba(30,41,59,0.6)' // slate-800 suave
+        ctx.fill()
+      }
+
+      // líneas cercanas
+      ctx.lineWidth = 0.6
+      for (let i = 0; i < P.length; i++) {
+        for (let j = i + 1; j < P.length; j++) {
+          const a = P[i], b = P[j]
+          const dx = a.x - b.x, dy = a.y - b.y
+          const d2 = dx * dx + dy * dy
+          if (d2 < 140 * 140) {
+            const alpha = 1 - (Math.sqrt(d2) / 140)
+            ctx.strokeStyle = `rgba(14,165,233,${alpha * 0.25})` // cyan
+            ctx.beginPath()
+            ctx.moveTo(a.x, a.y)
+            ctx.lineTo(b.x, b.y)
+            ctx.stroke()
+          }
+        }
+      }
+
+      raf = requestAnimationFrame(loop)
+    }
+    raf = requestAnimationFrame(loop)
+
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('resize', onResize)
+      canvas.removeEventListener('mousemove', onMouse)
+      canvas.removeEventListener('mouseleave', onLeave)
+    }
+  }, [])
+
+  return (
+    <div className="absolute inset-0 -z-[1] overflow-hidden rounded-3xl">
+      <canvas ref={ref} className="w-full h-full" />
+    </div>
+  )
+}
+
+// Botón con efecto imán (hover 3D sutil + follow)
+function MagneticButton({ href, children, className = '', ...rest }:{
+  href: string; children: React.ReactNode; className?: string
+} & React.HTMLAttributes<HTMLAnchorElement>) {
+  const ref = React.useRef<HTMLAnchorElement>(null)
+  React.useEffect(() => {
+    const el = ref.current!
+    const onMove = (e: MouseEvent) => {
+      const r = el.getBoundingClientRect()
+      const x = e.clientX - (r.left + r.width/2)
+      const y = e.clientY - (r.top + r.height/2)
+      el.style.transform = `translate(${x * 0.06}px, ${y * 0.06}px) rotateX(${(-y)*0.02}deg) rotateY(${x*0.02}deg)`
+    }
+    const onLeave = () => { el.style.transform = 'translate(0,0) rotateX(0) rotateY(0)' }
+    el.addEventListener('mousemove', onMove)
+    el.addEventListener('mouseleave', onLeave)
+    return () => { el.removeEventListener('mousemove', onMove); el.removeEventListener('mouseleave', onLeave) }
+  }, [])
+  return (
+    <a
+      ref={ref}
+      href={href}
+      className={`rounded-2xl bg-slate-900 text-white px-5 py-2.5 text-sm transition will-change-transform ${className}`}
+      {...rest}
+    >
+      {children}
+    </a>
+  )
+}
+
+// Confetti discreto cuando #jugadores entra en viewport
+function SectionConfetti({ targetId = 'jugadores' }) {
+  const ref = React.useRef<HTMLCanvasElement>(null)
+  React.useEffect(() => {
+    const el = document.getElementById(targetId)
+    if (!el) return
+    const canvas = ref.current!
+    const ctx = canvas.getContext('2d')!
+    let w = canvas.width = window.innerWidth
+    let h = canvas.height = window.innerHeight
+
+    const onResize = () => { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight }
+    window.addEventListener('resize', onResize)
+
+    let active = false, t0 = 0
+    const colors = ['#06b6d4','#0ea5e9','#8b5cf6','#f59e0b','#10b981'] // tailwind vibes
+    const pieces = Array.from({ length: 140 }, () => ({
+      x: Math.random() * w,
+      y: -20 - Math.random() * 200,
+      vy: 2 + Math.random() * 2.5,
+      vx: (Math.random()-0.5) * 1.5,
+      r: 4 + Math.random() * 4,
+      c: colors[Math.floor(Math.random()*colors.length)],
+      rot: Math.random()*Math.PI*2,
+      vr: (Math.random()-0.5)*0.2
+    }))
+
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting && !active) {
+          active = true; t0 = performance.now()
+          requestAnimationFrame(loop)
+          // auto-stop a los 2.5s
+          setTimeout(() => { active = false; ctx.clearRect(0,0,w,h) }, 2500)
+        }
+      })
+    }, { threshold: 0.3 })
+    io.observe(el)
+
+    function loop(t:number) {
+      if (!active) return
+      ctx.clearRect(0,0,w,h)
+      for (const p of pieces) {
+        p.y += p.vy
+        p.x += p.vx
+        p.rot += p.vr
+        if (p.y > h + 20) { p.y = -20; p.x = Math.random()*w }
+        ctx.save()
+        ctx.translate(p.x, p.y)
+        ctx.rotate(p.rot)
+        ctx.fillStyle = p.c
+        ctx.fillRect(-p.r, -p.r, p.r*2, p.r*2 * (0.6 + 0.4*Math.sin(t*0.01)))
+        ctx.restore()
+      }
+      requestAnimationFrame(loop)
+    }
+
+    return () => { io.disconnect(); window.removeEventListener('resize', onResize) }
+  }, [targetId])
+
+  return <canvas ref={ref} className="pointer-events-none fixed inset-0 z-[55]" />
+}
+
+/* ─────────────────────────────────────────────────────────
    Tipos y configuración
    ───────────────────────────────────────────────────────── */
 type Player = {
-  id: string
-  name: string
-  level: string
-  club?: string
-  ig?: string
-  photo?: string
+  id: string; name: string; level: string; club?: string; ig?: string; photo?: string
 }
 
 const FORM_URL =
@@ -118,7 +316,6 @@ function resolvePhoto(url?: string) {
   const clean = url.startsWith('/') ? url.slice(1) : url
   return `${import.meta.env.BASE_URL}${clean}`
 }
-
 function useCountdown(targetISO: string) {
   const target = React.useMemo(() => new Date(targetISO).getTime(), [targetISO])
   const [ms, setMs] = React.useState(() => Math.max(0, target - Date.now()))
@@ -169,43 +366,34 @@ function Nav() {
   return (
     <header className="sticky top-0 z-40 w-full backdrop-blur bg-white/70 border-b border-slate-200">
       <div className="mx-auto max-w-[1100px] px-4 md:px-6 h-14 flex items-center justify-between">
-        <a href="#" className="font-semibold text-slate-800">
-          J &amp; S Padel
-        </a>
+        <a href="#" className="font-semibold text-slate-800">J &amp; S Padel</a>
         <nav className="hidden md:flex gap-6 text-sm">
           <a href="#inscripcion" className="text-slate-600 hover:text-slate-900">Inscripción</a>
           <a href="#redes" className="text-slate-600 hover:text-slate-900">Redes</a>
           <a href="#galeria" className="text-slate-600 hover:text-slate-900">Galería</a>
           <a href="#jugadores" className="text-slate-600 hover:text-slate-900">Jugadores</a>
         </nav>
-        <a
-          href={FORM_URL}
-          target="_blank"
-          className="rounded-xl bg-cyan-500 text-white text-sm px-3 py-2 hover:bg-cyan-600 transition"
-        >
+        <MagneticButton href={FORM_URL} target="_blank">
           Inscríbete
-        </a>
+        </MagneticButton>
       </div>
     </header>
   )
 }
 
+// Tarjeta “Próximo pozo” para el hero
 function NextPozoCard(props: {
-  dateISO: string
-  lugar: string
-  precio?: string
-  plazas?: string
-  formUrl: string
-  bgImageUrl?: string
+  dateISO: string; lugar: string; precio?: string; plazas?: string; formUrl: string; bgImageUrl?: string
 }) {
   const c = useCountdown(props.dateISO)
   return (
     <div className="relative rounded-3xl h-56 md:h-72 overflow-hidden border border-slate-200 shadow-inner bg-gradient-to-br from-cyan-50 to-violet-50">
+      <ParticleField /> {/* fondo dinámico tech */}
       {props.bgImageUrl && (
         <img
           src={props.bgImageUrl}
           alt="Cartel pozo"
-          className="absolute inset-0 w-full h-full object-cover opacity-50"
+          className="absolute inset-0 w-full h-full object-cover opacity-35 mix-blend-multiply"
         />
       )}
       <div className="absolute inset-0 bg-gradient-to-tr from-white/70 via-white/30 to-transparent" />
@@ -214,37 +402,18 @@ function NextPozoCard(props: {
           <div className="text-xs uppercase tracking-wide text-slate-500">Próximo pozo</div>
           <div className="mt-1 text-lg font-semibold text-slate-900">
             {new Date(props.dateISO).toLocaleString('es-ES', {
-              weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+              weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
             })}
           </div>
           <div className="mt-1 text-sm text-slate-600">{props.lugar}</div>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600">
-            {props.precio && (
-              <span className="rounded-full bg-white/70 px-2 py-1 border border-slate-200">{props.precio}</span>
-            )}
-            {props.plazas && (
-              <span className="rounded-full bg-white/70 px-2 py-1 border border-slate-200">{props.plazas}</span>
-            )}
+            {props.precio && <span className="rounded-full bg-white/70 px-2 py-1 border border-slate-200">{props.precio}</span>}
+            {props.plazas && <span className="rounded-full bg-white/70 px-2 py-1 border border-slate-200">{props.plazas}</span>}
           </div>
         </div>
-        <div className="flex items-center justify-between">
-          <div className="font-mono text-slate-800 text-sm md:text-base">
-            {c.done ? (
-              <span className="text-emerald-600">¡En juego!</span>
-            ) : (
-              <span>
-                {String(c.d).padStart(2,'0')}d:{String(c.h).padStart(2,'0')}h:{String(c.m).padStart(2,'0')}m:{String(c.s).padStart(2,'0')}s
-              </span>
-            )}
-          </div>
-          <a
-            href={props.formUrl}
-            target="_blank"
-            className="rounded-xl bg-cyan-500 text-white text-xs md:text-sm px-3 py-2 hover:bg-cyan-600 transition"
-          >
-            Inscribirme
-          </a>
-        </div>
+        <MagneticButton href={props.formUrl} target="_blank" className="bg-cyan-500 hover:bg-cyan-600">
+          Inscribirme
+        </MagneticButton>
       </div>
     </div>
   )
@@ -269,17 +438,8 @@ function Hero() {
                 Organizamos pozos de ~2h en instalaciones municipales. Inscríbete, ve fotos y consulta perfiles de jugadores.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <a
-                  href={FORM_URL}
-                  target="_blank"
-                  className="rounded-2xl bg-slate-900 text-white px-5 py-2.5 text-sm hover:-translate-y-0.5 transition"
-                >
-                  Abrir formulario
-                </a>
-                <a
-                  href="#jugadores"
-                  className="rounded-2xl border border-slate-300 px-5 py-2.5 text-sm hover:bg-slate-50 transition"
-                >
+                <MagneticButton href={FORM_URL} target="_blank">Abrir formulario</MagneticButton>
+                <a href="#jugadores" className="rounded-2xl border border-slate-300 px-5 py-2.5 text-sm hover:bg-slate-50 transition">
                   Ver jugadores
                 </a>
               </div>
@@ -361,12 +521,6 @@ function Galeria() {
                   alt={g.alt}
                   loading="lazy"
                   className="w-full h-40 md:h-48 object-cover group-hover:scale-[1.02] transition"
-                  srcSet={
-                    g.src.includes('images.unsplash.com')
-                      ? `${g.src}&w=400 400w, ${g.src}&w=800 800w`
-                      : undefined
-                  }
-                  sizes="(max-width: 768px) 50vw, 33vw"
                 />
               </a>
             </Reveal>
@@ -457,6 +611,7 @@ export default function App() {
   return (
     <div className="bg-white text-slate-900">
       <ScrollProgress />
+      <SectionConfetti targetId="jugadores" />
       <Nav />
       <Hero />
       <Inscripcion />
