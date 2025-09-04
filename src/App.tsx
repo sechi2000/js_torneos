@@ -2,6 +2,94 @@ import React from 'react'
 import { fetchCSV } from './utils/csv'
 
 /* ─────────────────────────────────────────────────────────
+   Scroll extras (barra progreso, reveal, parallax)
+   ───────────────────────────────────────────────────────── */
+function ScrollProgress() {
+  const [p, setP] = React.useState(0)
+  React.useEffect(() => {
+    const f = () => {
+      const h = document.documentElement
+      const max = h.scrollHeight - h.clientHeight
+      setP(max > 0 ? h.scrollTop / max : 0)
+    }
+    f()
+    window.addEventListener('scroll', f, { passive: true })
+    window.addEventListener('resize', f)
+    return () => { window.removeEventListener('scroll', f); window.removeEventListener('resize', f) }
+  }, [])
+  return (
+    <div className="fixed inset-x-0 top-0 z-50 h-0.5 bg-transparent">
+      <div
+        className="h-full bg-gradient-to-r from-cyan-500 to-violet-500 transition-[width] duration-150 ease-out"
+        style={{ width: `${p * 100}%` }}
+      />
+    </div>
+  )
+}
+
+function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+  const ref = React.useRef<HTMLDivElement>(null)
+  const [show, setShow] = React.useState(false)
+  React.useEffect(() => {
+    const el = ref.current!
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((e) => e.isIntersecting && setShow(true)),
+      { threshold: 0.12 }
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
+  return (
+    <div
+      ref={ref}
+      style={{ transitionDelay: `${delay}ms` }}
+      className={[
+        'will-change-transform will-change-opacity',
+        'transition duration-700 ease-out',
+        show ? 'opacity-100 translate-y-0 blur-0' : 'opacity-0 translate-y-6 blur-[2px]'
+      ].join(' ')}
+    >
+      {children}
+    </div>
+  )
+}
+
+function ParallaxDecor() {
+  const ref = React.useRef<HTMLDivElement>(null)
+  React.useEffect(() => {
+    let id = 0
+    const onScroll = () => {
+      const y = window.scrollY || 0
+      ref.current?.style.setProperty('--t1', `${y * 0.06}px`)
+      ref.current?.style.setProperty('--t2', `${y * 0.03}px`)
+    }
+    const loop = () => { onScroll(); id = requestAnimationFrame(loop) }
+    id = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(id)
+  }, [])
+  return (
+    <div ref={ref} aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div
+        className="absolute -top-24 -right-20 w-[36rem] h-[36rem] rounded-full opacity-30 blur-2xl"
+        style={{
+          transform: 'translateY(var(--t1,0))',
+          background:
+            'radial-gradient(closest-side, rgba(14,165,233,.35), rgba(14,165,233,0) 70%)'
+        }}
+      />
+      <div
+        className="absolute -bottom-20 -left-24 w-[30rem] h-[30rem] rounded-full opacity-30 blur-2xl"
+        style={{
+          transform: 'translateY(calc(var(--t2,0) * -1))',
+          background:
+            'radial-gradient(closest-side, rgba(139,92,246,.35), rgba(139,92,246,0) 70%)'
+        }}
+      />
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────
    Tipos y configuración
    ───────────────────────────────────────────────────────── */
 type Player = {
@@ -19,14 +107,11 @@ const IG_URL = 'https://www.instagram.com/js_torneos/'
 
 const GALLERY: { src: string; alt: string }[] = [
   { src: `${import.meta.env.BASE_URL}carteles/pozo1.png`, alt: 'Pozo 1' },
-  // añade más si quieres…
 ]
 
 /* ─────────────────────────────────────────────────────────
    Helpers
    ───────────────────────────────────────────────────────── */
-
-// Asegura rutas correctas con BASE_URL para imágenes locales
 function resolvePhoto(url?: string) {
   if (!url) return ''
   if (/^https?:\/\//i.test(url)) return url
@@ -34,7 +119,6 @@ function resolvePhoto(url?: string) {
   return `${import.meta.env.BASE_URL}${clean}`
 }
 
-// Cuenta atrás simple
 function useCountdown(targetISO: string) {
   const target = React.useMemo(() => new Date(targetISO).getTime(), [targetISO])
   const [ms, setMs] = React.useState(() => Math.max(0, target - Date.now()))
@@ -89,18 +173,10 @@ function Nav() {
           J &amp; S Padel
         </a>
         <nav className="hidden md:flex gap-6 text-sm">
-          <a href="#inscripcion" className="text-slate-600 hover:text-slate-900">
-            Inscripción
-          </a>
-          <a href="#redes" className="text-slate-600 hover:text-slate-900">
-            Redes
-          </a>
-          <a href="#galeria" className="text-slate-600 hover:text-slate-900">
-            Galería
-          </a>
-          <a href="#jugadores" className="text-slate-600 hover:text-slate-900">
-            Jugadores
-          </a>
+          <a href="#inscripcion" className="text-slate-600 hover:text-slate-900">Inscripción</a>
+          <a href="#redes" className="text-slate-600 hover:text-slate-900">Redes</a>
+          <a href="#galeria" className="text-slate-600 hover:text-slate-900">Galería</a>
+          <a href="#jugadores" className="text-slate-600 hover:text-slate-900">Jugadores</a>
         </nav>
         <a
           href={FORM_URL}
@@ -114,7 +190,6 @@ function Nav() {
   )
 }
 
-// Tarjeta “Próximo pozo” para el hero
 function NextPozoCard(props: {
   dateISO: string
   lugar: string
@@ -139,24 +214,16 @@ function NextPozoCard(props: {
           <div className="text-xs uppercase tracking-wide text-slate-500">Próximo pozo</div>
           <div className="mt-1 text-lg font-semibold text-slate-900">
             {new Date(props.dateISO).toLocaleString('es-ES', {
-              weekday: 'short',
-              day: '2-digit',
-              month: 'short',
-              hour: '2-digit',
-              minute: '2-digit',
+              weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
             })}
           </div>
           <div className="mt-1 text-sm text-slate-600">{props.lugar}</div>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600">
             {props.precio && (
-              <span className="rounded-full bg-white/70 px-2 py-1 border border-slate-200">
-                {props.precio}
-              </span>
+              <span className="rounded-full bg-white/70 px-2 py-1 border border-slate-200">{props.precio}</span>
             )}
             {props.plazas && (
-              <span className="rounded-full bg-white/70 px-2 py-1 border border-slate-200">
-                {props.plazas}
-              </span>
+              <span className="rounded-full bg-white/70 px-2 py-1 border border-slate-200">{props.plazas}</span>
             )}
           </div>
         </div>
@@ -166,8 +233,7 @@ function NextPozoCard(props: {
               <span className="text-emerald-600">¡En juego!</span>
             ) : (
               <span>
-                {String(c.d).padStart(2, '0')}d:{String(c.h).padStart(2, '0')}h:
-                {String(c.m).padStart(2, '0')}m:{String(c.s).padStart(2, '0')}s
+                {String(c.d).padStart(2,'0')}d:{String(c.h).padStart(2,'0')}h:{String(c.m).padStart(2,'0')}m:{String(c.s).padStart(2,'0')}s
               </span>
             )}
           </div>
@@ -187,46 +253,49 @@ function NextPozoCard(props: {
 function Hero() {
   return (
     <section className="relative">
+      <ParallaxDecor />
       <div className="mx-auto max-w-[1100px] px-4 md:px-6 py-14 md:py-20">
         <div className="grid md:grid-cols-2 gap-10 items-center">
-          <div>
-            <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-slate-900">
-              Torneos tipo{' '}
-              <span className="bg-gradient-to-r from-cyan-500 to-violet-500 bg-clip-text text-transparent">
-                POZO
-              </span>
-              <br /> rápidos, justos y divertidos
-            </h1>
-            <p className="mt-4 text-slate-600">
-              Organizamos pozos de ~2h en instalaciones municipales. Inscríbete, ve fotos y consulta
-              perfiles de jugadores.
-            </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <a
-                href={FORM_URL}
-                target="_blank"
-                className="rounded-2xl bg-slate-900 text-white px-5 py-2.5 text-sm hover:-translate-y-0.5 transition"
-              >
-                Abrir formulario
-              </a>
-              <a
-                href="#jugadores"
-                className="rounded-2xl border border-slate-300 px-5 py-2.5 text-sm hover:bg-slate-50 transition"
-              >
-                Ver jugadores
-              </a>
+          <Reveal>
+            <div>
+              <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-slate-900">
+                Torneos tipo{' '}
+                <span className="bg-gradient-to-r from-cyan-500 to-violet-500 bg-clip-text text-transparent">
+                  POZO
+                </span>
+                <br /> rápidos, justos y divertidos
+              </h1>
+              <p className="mt-4 text-slate-600">
+                Organizamos pozos de ~2h en instalaciones municipales. Inscríbete, ve fotos y consulta perfiles de jugadores.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <a
+                  href={FORM_URL}
+                  target="_blank"
+                  className="rounded-2xl bg-slate-900 text-white px-5 py-2.5 text-sm hover:-translate-y-0.5 transition"
+                >
+                  Abrir formulario
+                </a>
+                <a
+                  href="#jugadores"
+                  className="rounded-2xl border border-slate-300 px-5 py-2.5 text-sm hover:bg-slate-50 transition"
+                >
+                  Ver jugadores
+                </a>
+              </div>
             </div>
-          </div>
+          </Reveal>
 
-          {/* Tarjeta en la columna derecha */}
-          <NextPozoCard
-            dateISO="2025-09-15T10:00:00"
-            lugar="Polideportivo Municipal"
-            precio="12€ por jugador"
-            plazas="16 plazas"
-            formUrl={FORM_URL}
-            bgImageUrl={`${import.meta.env.BASE_URL}carteles/pozo1.png`}
-          />
+          <Reveal delay={120}>
+            <NextPozoCard
+              dateISO="2025-09-15T10:00:00"
+              lugar="Polideportivo Municipal"
+              precio="12€ por jugador"
+              plazas="16 plazas"
+              formUrl={FORM_URL}
+              bgImageUrl={`${import.meta.env.BASE_URL}carteles/pozo1.png`}
+            />
+          </Reveal>
         </div>
       </div>
     </section>
@@ -237,15 +306,17 @@ function Inscripcion() {
   return (
     <section id="inscripcion" className="border-t border-slate-200">
       <div className="mx-auto max-w-[1100px] px-4 md:px-6 py-12">
-        <h2 className="text-xl font-semibold text-slate-900">Inscripción</h2>
-        <p className="text-slate-600 mt-2">Completa el formulario para confirmar tu plaza.</p>
-        <a
-          href={FORM_URL}
-          target="_blank"
-          className="mt-4 inline-block rounded-xl bg-cyan-500 text-white px-5 py-2.5 text-sm hover:bg-cyan-600 transition"
-        >
-          Abrir formulario
-        </a>
+        <Reveal>
+          <h2 className="text-xl font-semibold text-slate-900">Inscripción</h2>
+          <p className="text-slate-600 mt-2">Completa el formulario para confirmar tu plaza.</p>
+          <a
+            href={FORM_URL}
+            target="_blank"
+            className="mt-4 inline-block rounded-xl bg-cyan-500 text-white px-5 py-2.5 text-sm hover:bg-cyan-600 transition"
+          >
+            Abrir formulario
+          </a>
+        </Reveal>
       </div>
     </section>
   )
@@ -255,15 +326,17 @@ function Redes() {
   return (
     <section id="redes" className="border-t border-slate-200">
       <div className="mx-auto max-w-[1100px] px-4 md:px-6 py-12">
-        <h2 className="text-xl font-semibold text-slate-900">Redes</h2>
-        <p className="text-slate-600 mt-2">Síguenos y etiqueta tus fotos del pozo 😊</p>
-        <a
-          href={IG_URL}
-          target="_blank"
-          className="mt-4 inline-block rounded-xl border border-slate-300 px-5 py-2.5 text-sm hover:bg-slate-50 transition"
-        >
-          Instagram
-        </a>
+        <Reveal>
+          <h2 className="text-xl font-semibold text-slate-900">Redes</h2>
+          <p className="text-slate-600 mt-2">Síguenos y etiqueta tus fotos del pozo 😊</p>
+          <a
+            href={IG_URL}
+            target="_blank"
+            className="mt-4 inline-block rounded-xl border border-slate-300 px-5 py-2.5 text-sm hover:bg-slate-50 transition"
+          >
+            Instagram
+          </a>
+        </Reveal>
       </div>
     </section>
   )
@@ -273,29 +346,30 @@ function Galeria() {
   return (
     <section id="galeria" className="border-t border-slate-200">
       <div className="mx-auto max-w-[1100px] px-4 md:px-6 py-12">
-        <h2 className="text-xl font-semibold text-slate-900">Galería</h2>
-        <p className="text-slate-600 mt-2">Las mejores fotos de torneos anteriores.</p>
+        <Reveal><h2 className="text-xl font-semibold text-slate-900">Galería</h2></Reveal>
+        <Reveal delay={80}><p className="text-slate-600 mt-2">Las mejores fotos de torneos anteriores.</p></Reveal>
         <div className="mt-6 grid grid-cols-2 md:grid-cols-3 gap-3">
           {GALLERY.map((g, i) => (
-            <a
-              key={i}
-              href={g.src}
-              target="_blank"
-              className="group block rounded-2xl overflow-hidden border border-slate-200"
-            >
-              <img
-                src={g.src}
-                alt={g.alt}
-                loading="lazy"
-                className="w-full h-40 md:h-48 object-cover group-hover:scale-[1.02] transition"
-                srcSet={
-                  g.src.includes('images.unsplash.com')
-                    ? `${g.src}&w=400 400w, ${g.src}&w=800 800w`
-                    : undefined
-                }
-                sizes="(max-width: 768px) 50vw, 33vw"
-              />
-            </a>
+            <Reveal key={i} delay={i * 60}>
+              <a
+                href={g.src}
+                target="_blank"
+                className="group block rounded-2xl overflow-hidden border border-slate-200"
+              >
+                <img
+                  src={g.src}
+                  alt={g.alt}
+                  loading="lazy"
+                  className="w-full h-40 md:h-48 object-cover group-hover:scale-[1.02] transition"
+                  srcSet={
+                    g.src.includes('images.unsplash.com')
+                      ? `${g.src}&w=400 400w, ${g.src}&w=800 800w`
+                      : undefined
+                  }
+                  sizes="(max-width: 768px) 50vw, 33vw"
+                />
+              </a>
+            </Reveal>
           ))}
         </div>
       </div>
@@ -333,30 +407,31 @@ function Jugadores({ players }: { players: Player[] }) {
         </div>
 
         <div className="mt-6 grid sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {list.map((p) => (
-            <div key={p.id} className="rounded-2xl border border-slate-200 p-4 flex gap-3 items-center">
-              <img
-                src={resolvePhoto(p.photo) || 'https://i.pravatar.cc/100'}
-                alt={p.name}
-                className="w-14 h-14 rounded-full object-cover"
-              />
-              <div className="min-w-0">
-                <div className="font-medium text-slate-900 truncate">{p.name}</div>
-                <div className="text-xs text-slate-500 truncate">
-                  {p.level}
-                  {p.club ? ` · ${p.club}` : ''}
+          {list.map((p, i) => (
+            <Reveal key={p.id} delay={i * 40}>
+              <div className="rounded-2xl border border-slate-200 p-4 flex gap-3 items-center">
+                <img
+                  src={resolvePhoto(p.photo) || 'https://i.pravatar.cc/100'}
+                  alt={p.name}
+                  className="w-14 h-14 rounded-full object-cover"
+                />
+                <div className="min-w-0">
+                  <div className="font-medium text-slate-900 truncate">{p.name}</div>
+                  <div className="text-xs text-slate-500 truncate">
+                    {p.level}{p.club ? ` · ${p.club}` : ''}
+                  </div>
+                  {p.ig && (
+                    <a
+                      href={`https://instagram.com/${p.ig.replace('@', '')}`}
+                      target="_blank"
+                      className="text-xs text-cyan-600 hover:underline"
+                    >
+                      {p.ig}
+                    </a>
+                  )}
                 </div>
-                {p.ig && (
-                  <a
-                    href={`https://instagram.com/${p.ig.replace('@', '')}`}
-                    target="_blank"
-                    className="text-xs text-cyan-600 hover:underline"
-                  >
-                    {p.ig}
-                  </a>
-                )}
               </div>
-            </div>
+            </Reveal>
           ))}
         </div>
       </div>
@@ -381,6 +456,7 @@ export default function App() {
   const players = usePlayers()
   return (
     <div className="bg-white text-slate-900">
+      <ScrollProgress />
       <Nav />
       <Hero />
       <Inscripcion />
