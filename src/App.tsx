@@ -10,13 +10,14 @@ const FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSepjrGlEfJqq8Tg4vFsqw
 const IG_URL   = 'https://www.instagram.com/js_torneos/'
 
 const GALLERY: { src: string; alt: string }[] = [
-  { src: 'https://images.unsplash.com/photo-1513245543132-31f507417b26?q=80&auto=format&fit=crop', alt: 'Pozo 1' },
+  { src: `${import.meta.env.BASE_URL}public/carteles/pozo1.png`, alt: 'Pozo 1' },
   { src: 'https://images.unsplash.com/photo-1520975922192-24cd97bca3d5?q=80&auto=format&fit=crop', alt: 'Pozo 2' },
   { src: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&auto=format&fit=crop', alt: 'Pozo 3' },
   { src: 'https://images.unsplash.com/photo-1552074280-9d5c3b0a3f6a?q=80&auto=format&fit=crop', alt: 'Pozo 4' },
   { src: 'https://images.unsplash.com/photo-1508672019048-805c876b67e2?q=80&auto=format&fit=crop', alt: 'Pozo 5' },
   { src: 'https://images.unsplash.com/photo-1530023367847-a683933f417f?q=80&auto=format&fit=crop', alt: 'Pozo 6' },
 ]
+
 
 /* ─────────────────────────────────────────────────────────
    Hook: carga jugadores desde /public/players.csv
