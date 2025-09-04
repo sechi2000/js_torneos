@@ -5,11 +5,7 @@ const FORM_URL='https://docs.google.com/forms/d/e/1FAIpQLSepjrGlEfJqq8Tg4vFsqw7T
 const IG_URL='https://www.instagram.com/js_torneos/'
 const GALLERY=[
   {src:`${import.meta.env.BASE_URL}carteles/pozo1.png`,alt:'Pozo 1'},
-  {src:'https://images.unsplash.com/photo-1520975922192-24cd97bca3d5?q=80&auto=format&fit=crop',alt:'Pozo 2'},
-  {src:'https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&auto=format&fit=crop',alt:'Pozo 3'},
-  {src:'https://images.unsplash.com/photo-1552074280-9d5c3b0a3f6a?q=80&auto=format&fit=crop',alt:'Pozo 4'},
-  {src:'https://images.unsplash.com/photo-1508672019048-805c876b67e2?q=80&auto=format&fit=crop',alt:'Pozo 5'},
-  {src:'https://images.unsplash.com/photo-1530023367847-a683933f417f?q=80&auto=format&fit=crop',alt:'Pozo 6'},
+ 
 ]
 function usePlayers(){const[p,setP]=React.useState<Player[]>([]);React.useEffect(()=>{(async()=>{try{const url=`${import.meta.env.BASE_URL}players.csv`;const d=await fetchCSV(url);const m=d.map((r:any,i:number):Player=>({id:r.id||String(i),name:r.name||'Jugador',level:r.level||'',club:r.club||'',ig:r.ig||'',photo:r.photo||''}));setP(m)}catch(e){console.error(e);setP([])}})()},[]);return p}
 function Nav(){return(<header className='sticky top-0 z-40 w-full backdrop-blur bg-white/70 border-b border-slate-200'><div className='mx-auto max-w-[1100px] px-4 md:px-6 h-14 flex items-center justify-between'><a href='#' className='font-semibold text-slate-800'>J & S Padel</a><nav className='hidden md:flex gap-6 text-sm'><a href='#inscripcion' className='text-slate-600 hover:text-slate-900'>Inscripción</a><a href='#redes' className='text-slate-600 hover:text-slate-900'>Redes</a><a href='#galeria' className='text-slate-600 hover:text-slate-900'>Galería</a><a href='#jugadores' className='text-slate-600 hover:text-slate-900'>Jugadores</a></nav><a href={FORM_URL} target='_blank' className='rounded-xl bg-cyan-500 text-white text-sm px-3 py-2 hover:bg-cyan-600 transition'>Inscríbete</a></div></header>)}
