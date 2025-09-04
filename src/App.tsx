@@ -219,14 +219,14 @@ function Hero() {
             </div>
           </div>
 
-          <NextPozoCard
-            dateISO="2025-09-15T10:00:00"
-            lugar="Polideportivo Municipal"
-            precio="12€ por jugador"
-            plazas="16 plazas"
-            formUrl={FORM_URL}
-            bgImageUrl={`${import.meta.env.BASE_URL}carteles/pozo1.png`}
-          />
+        <NextPozoCard
+          dateISO="2025-09-15T10:00:00"
+          lugar="Polideportivo Municipal"
+          precio="12€ por jugador"
+          plazas="16 plazas"
+          formUrl={FORM_URL}
+          bgImageUrl={`${import.meta.env.BASE_URL}carteles/pozo1.png`}
+        />
         </div>
       </div>
     </section>
@@ -304,14 +304,15 @@ function Galeria() {
 }
 
 /* ─────────────────────────────────────────────────────────
-   Instagram (opción 1 – sin servidor, con ig.json)
+   Instagram (sin servidor) con proxy de imágenes
+   Lee /public/ig.json (permalinks de IG) y genera miniaturas
+   usando un proxy para evitar 403/CORS.
+   Formato ig.json:
+   [
+     "https://www.instagram.com/reel/C9ABcDeFG45/",
+     "https://www.instagram.com/p/CuPQ987xyzA/"
+   ]
    ───────────────────────────────────────────────────────── */
-// Lee /public/ig.json y para cada permalink genera una miniatura compatible.
-// Formato de ig.json:
-// [
-//   "https://www.instagram.com/reel/C9ABcDeFG45/",
-//   "https://www.instagram.com/p/CuPQ987xyzA/"
-// ]
 function IGFeedStatic() {
   const [links, setLinks] = React.useState<string[]>([])
 
@@ -327,14 +328,28 @@ function IGFeedStatic() {
     })()
   }, [])
 
-  // Deriva miniatura desde un permalink IG
-  const toThumb = (url: string) => {
+  // Deriva el shortcode del permalink
+  const getCode = (url: string) => {
     const m = url.match(/\/(p|reel)\/([^/?#]+)/i)
-    if (!m) return ''
-    const code = m[2]
-    // Truco: endpoint de imagen de post (suele servir para reels también)
-    return `https://www.instagram.com/p/${code}/media/?size=l`
+    return m ? m[2] : ''
   }
+
+  // Miniatura original de IG (puede devolver 403)
+  const rawThumb = (code: string) =>
+    `https://www.instagram.com/p/${code}/media/?size=l`
+
+  // Proxiar por images.weserv.nl para evitar CORS/403
+  const proxied = (code: string) => {
+    const target = `www.instagram.com/p/${code}/media/?size=l`
+    return `https://images.weserv.nl/?url=${encodeURIComponent(target)}&w=800&output=jpg`
+  }
+
+  // Fallback local si todo falla
+  const FALLBACK =
+    'data:image/svg+xml;utf8,' +
+    encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="100%" height="100%" fill="#eef2f7"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#94a3b8" font-family="sans-serif" font-size="20">Instagram</text></svg>`
+    )
 
   if (!links.length) return null
 
@@ -346,7 +361,10 @@ function IGFeedStatic() {
 
         <div className="mt-6 grid grid-cols-2 md:grid-cols-3 gap-3">
           {links.map((href, i) => {
-            const thumb = toThumb(href)
+            const code = getCode(href)
+            const src = code ? proxied(code) : ''
+            const fallback = code ? rawThumb(code) : FALLBACK
+
             return (
               <a
                 key={i}
@@ -355,20 +373,24 @@ function IGFeedStatic() {
                 rel="noreferrer"
                 className="group block rounded-2xl overflow-hidden border border-slate-200 bg-slate-100"
               >
-                {thumb ? (
-                  <img
-                    src={thumb}
-                    alt="Instagram"
-                    loading="lazy"
-                    className="w-full h-48 object-cover group-hover:scale-[1.02] transition"
-                    referrerPolicy="no-referrer"
-                    crossOrigin="anonymous"
-                  />
-                ) : (
-                  <div className="h-48 flex items-center justify-center text-slate-400 text-sm">
-                    Link no válido
-                  </div>
-                )}
+                <img
+                  src={src || FALLBACK}
+                  alt="Instagram"
+                  loading="lazy"
+                  className="w-full h-48 object-cover group-hover:scale-[1.02] transition"
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
+                  onError={(e) => {
+                    const img = e.currentTarget
+                    if (img.dataset.tried === 'proxy') {
+                      img.dataset.tried = 'direct'
+                      img.src = fallback
+                    } else {
+                      img.src = FALLBACK
+                    }
+                  }}
+                  data-tried="proxy"
+                />
               </a>
             )
           })}
