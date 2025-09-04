@@ -1,15 +1,19 @@
-import React from 'react'
+import React from "react"
 
 /* ─────────────────────────────────────────────────────────
-   Config / flags
+   Config
    ───────────────────────────────────────────────────────── */
 const FORM_URL =
-  'https://docs.google.com/forms/d/e/1FAIpQLSepjrGlEfJqq8Tg4vFsqw7Twh_TbAvApchG89qXU4UktgYihw/viewform?usp=header'
-const IG_URL = 'https://www.instagram.com/js_torneos/'
-const SHOW_IG = false // ← déjalo en false para evitar “roturas”. Si quieres probar el feed, pon true.
+  "https://docs.google.com/forms/d/e/1FAIpQLSepjrGlEfJqq8Tg4vFsqw7Twh_TbAvApchG89qXU4UktgYihw/viewform?usp=header"
+const IG_URL = "https://www.instagram.com/js_torneos/"
+const SHOW_IG = false
+const HERO_POSTER = `${import.meta.env.BASE_URL}carteles/pozo1.png`
+const GALLERY: { src: string; alt: string }[] = [
+  { src: `${import.meta.env.BASE_URL}carteles/pozo1.png`, alt: "Pozo 1" },
+]
 
 /* ─────────────────────────────────────────────────────────
-   Tipos + utilidades
+   Tipos
    ───────────────────────────────────────────────────────── */
 type Player = {
   id: string
@@ -23,66 +27,68 @@ type Player = {
 
 type Match = {
   id: string
-  date: string   // ISO o texto corto
-  p1: string     // player id
-  p2: string     // player id
-  score?: string // “6-4, 3-6, 10-8”
-  winner?: string // player id
+  date?: string
+  p1: string
+  p2: string
+  score?: string
+  winner?: string
+  round?: string
 }
 
-function resolvePublic(pathOrUrl?: string) {
-  if (!pathOrUrl) return ''
-  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl
-  const clean = pathOrUrl.startsWith('/') ? pathOrUrl.slice(1) : pathOrUrl
+type IgItem = { img: string; href?: string; alt?: string }
+
+/* ─────────────────────────────────────────────────────────
+   Helpers
+   ───────────────────────────────────────────────────────── */
+const safeUUID = () =>
+  (typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function')
+    ? (crypto as any).randomUUID()
+    : ('id_' + Math.random().toString(36).slice(2))
+
+function resolvePhoto(url?: string) {
+  if (!url) return ""
+  if (/^https?:\/\//i.test(url)) return url
+  const clean = url.startsWith("/") ? url.slice(1) : url
   return `${import.meta.env.BASE_URL}${clean}`
 }
 
-function useCountdown(targetISO: string) {
-  const target = React.useMemo(() => new Date(targetISO).getTime(), [targetISO])
-  const [ms, setMs] = React.useState(() => Math.max(0, target - Date.now()))
-  React.useEffect(() => {
-    const id = setInterval(() => setMs(Math.max(0, target - Date.now())), 1000)
-    return () => clearInterval(id)
-  }, [target])
-  const total = Math.floor(ms / 1000)
-  const d = Math.floor(total / 86400)
-  const h = Math.floor((total % 86400) / 3600)
-  const m = Math.floor((total % 3600) / 60)
-  const s = total % 60
-  return { d, h, m, s, done: ms <= 0 }
+async function fetchCSV(url: string) {
+  const r = await fetch(url, { cache: "no-store" })
+  if (!r.ok) throw new Error("CSV no disponible")
+  const txt = await r.text()
+  const clean = txt.replace(/^\uFEFF/, "")
+  const lines = clean.split(/\r?\n/).filter(l => l.trim() !== "")
+  if (!lines.length) return []
+  const headers = lines[0].split(",").map(h => h.trim())
+  return lines.slice(1).map(line => {
+    const cols = line.split(",").map(c => c.trim())
+    const rec: Record<string, string> = {}
+    headers.forEach((h, i) => rec[h] = cols[i] ?? "")
+    return rec
+  })
 }
 
 /* ─────────────────────────────────────────────────────────
-   Datos (CSV en /public)
+   Data hooks
    ───────────────────────────────────────────────────────── */
-// players.csv  -> id,name,level,club,ig,photo,rating
 function usePlayers() {
   const [players, setPlayers] = React.useState<Player[]>([])
   React.useEffect(() => {
     ;(async () => {
       try {
-        const url = `${import.meta.env.BASE_URL}players.csv`
-        const txt = await (await fetch(url)).text()
-        const rows = txt.trim().split(/\r?\n/)
-        const headers = rows[0].split(',').map((h) => h.trim())
-        const data = rows.slice(1).map((line) => {
-          const cols = line.split(',').map((c) => c.trim())
-          const rec: Record<string, string> = {}
-          headers.forEach((h, i) => (rec[h] = cols[i] ?? ''))
-          const rating = rec.rating ? Number(rec.rating) : undefined
-          return {
-            id: rec.id || crypto.randomUUID(),
-            name: rec.name || 'Jugador',
-            level: rec.level || '',
-            club: rec.club || '',
-            ig: rec.ig || '',
-            photo: rec.photo || '',
-            rating,
-          } as Player
-        })
-        setPlayers(data)
+        const rows = await fetchCSV(`${import.meta.env.BASE_URL}players.csv`)
+        const mapped: Player[] = rows.map((r, i) => ({
+          id: r.id || String(i + 1),
+          name: r.name || "Jugador",
+          level: r.level || "",
+          club: r.club || "",
+          ig: r.ig || "",
+          photo: r.photo || "",
+          rating: r.rating ? Number(r.rating) : undefined,
+        }))
+        setPlayers(mapped)
       } catch (e) {
-        console.error('Error leyendo players.csv', e)
+        console.error("players.csv error", e)
         setPlayers([])
       }
     })()
@@ -90,45 +96,137 @@ function usePlayers() {
   return players
 }
 
-// matches.csv -> id,date,p1,p2,score,winner
-function useMatches() {
+/** Lee leaderboard.csv detectando esquema:
+ * - Esquema A (matches): id,date,p1,p2,score,winner,round
+ * - Esquema B (tabla):   id,name,points,wins,losses,ig,photo
+ */
+function useLeaderboard() {
   const [matches, setMatches] = React.useState<Match[]>([])
+  const [table, setTable] = React.useState<{id:string; name?:string; points?:number; wins?:number; losses?:number; ig?:string; photo?:string}[]>([])
+
   React.useEffect(() => {
     ;(async () => {
       try {
-        const url = `${import.meta.env.BASE_URL}matches.csv`
-        const resp = await fetch(url)
-        if (!resp.ok) return setMatches([]) // si no existe, seguimos sin fallar
-        const txt = await resp.text()
-        const rows = txt.trim().split(/\r?\n/)
-        const headers = rows[0].split(',').map((h) => h.trim())
-        const data = rows.slice(1).map((line) => {
-          const cols = line.split(',').map((c) => c.trim())
-          const rec: Record<string, string> = {}
-          headers.forEach((h, i) => (rec[h] = cols[i] ?? ''))
-          return {
-            id: rec.id || crypto.randomUUID(),
-            date: rec.date || '',
-            p1: rec.p1 || '',
-            p2: rec.p2 || '',
-            score: rec.score || '',
-            winner: rec.winner || '',
-          } as Match
-        })
-        // ordena por fecha descendente si hay ISO
-        data.sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0))
-        setMatches(data)
+        const rows = await fetchCSV(`${import.meta.env.BASE_URL}leaderboard.csv`)
+        if (!rows.length) { setMatches([]); setTable([]); return }
+        const keys = Object.keys(rows[0]).map(k => k.toLowerCase())
+
+        const isMatches = keys.includes('p1') && keys.includes('p2')
+        if (isMatches) {
+          const data: Match[] = rows.map((r, i) => ({
+            id: r.id || safeUUID(),
+            date: r.date || "",
+            p1: r.p1 || "",
+            p2: r.p2 || "",
+            score: r.score || "",
+            winner: r.winner || "",
+            round: r.round || "",
+          }))
+          data.sort((a,b) => (new Date(b.date||'').getTime()||0)-(new Date(a.date||'').getTime()||0))
+          setMatches(data); setTable([])
+        } else {
+          // Tabla directa
+          const data = rows.map((r, i) => ({
+            id: r.id || safeUUID(),
+            name: r.name || "",
+            points: r.points ? Number(r.points) : undefined,
+            wins: r.wins ? Number(r.wins) : undefined,
+            losses: r.losses ? Number(r.losses) : undefined,
+            ig: r.ig || "",
+            photo: r.photo || "",
+          }))
+          // orden por points desc si hay, si no por wins desc
+          data.sort((a,b) => (b.points ?? 0) - (a.points ?? 0) || (b.wins ?? 0) - (a.wins ?? 0))
+          setTable(data); setMatches([])
+        }
       } catch (e) {
-        console.warn('matches.csv no encontrado (opcional).', e)
-        setMatches([])
+        console.warn("leaderboard.csv error", e)
+        setMatches([]); setTable([])
       }
     })()
   }, [])
-  return matches
+
+  return { matches, table }
+}
+
+function useInstagram() {
+  const [items, setItems] = React.useState<IgItem[]>([])
+  React.useEffect(() => {
+    ;(async () => {
+      try {
+        const r = await fetch(`${import.meta.env.BASE_URL}ig.json`, { cache: "no-store" })
+        if (!r.ok) throw new Error("ig.json no disponible")
+        const data = await r.json()
+        let out: IgItem[] = []
+        if (Array.isArray(data)) {
+          // Soporta array de strings o array de objetos
+          out = data.map((it: any) => {
+            if (typeof it === 'string') {
+              return { img: it, href: it }
+            } else {
+              return {
+                img: it.img,
+                href: it.href,
+                alt: it.alt || 'Instagram'
+              }
+            }
+          }).filter((it: IgItem) => typeof it.img === 'string' && it.img.length > 0)
+        }
+        setItems(out)
+      } catch (e) {
+        console.warn("IG feed desactivado:", e)
+        setItems([])
+      }
+    })()
+  }, [])
+  return items
 }
 
 /* ─────────────────────────────────────────────────────────
-   UI base
+   Ranking
+   ───────────────────────────────────────────────────────── */
+function computeRankingFromMatches(players: Player[], matches: Match[]) {
+  const base: Record<string, { player: Player; rating: number; wins: number; losses: number }> = {}
+  players.forEach(p => base[p.id] = { player: p, rating: p.rating ?? 1000, wins: 0, losses: 0 })
+
+  matches.slice().reverse().forEach(m => {
+    const a = base[m.p1]; const b = base[m.p2]
+    if (!a || !b) return
+    if (m.winner === m.p1) { a.wins++; b.losses++; a.rating += 15; b.rating = Math.max(500, b.rating-10) }
+    else if (m.winner === m.p2) { b.wins++; a.losses++; b.rating += 15; a.rating = Math.max(500, a.rating-10) }
+  })
+
+  const rows = Object.values(base)
+  rows.sort((x,y) => y.rating - x.rating)
+  return rows
+}
+
+function computeRankingFromTable(players: Player[], table: {id:string; name?:string; points?:number; wins?:number; losses?:number; ig?:string; photo?:string}[]) {
+  // Merge por id; si id no está en players, creamos un pseudo-player
+  const byId = new Map(players.map(p => [p.id, p]))
+  const rows = table.map(row => {
+    const p = byId.get(row.id) || {
+      id: row.id,
+      name: row.name || `Jugador ${row.id}`,
+      level: '',
+      club: '',
+      ig: row.ig || '',
+      photo: row.photo || '',
+      rating: row.points
+    } as Player
+    return {
+      player: { ...p, photo: row.photo || p.photo, ig: row.ig || p.ig },
+      rating: row.points ?? (p.rating ?? 1000),
+      wins: row.wins ?? 0,
+      losses: row.losses ?? 0
+    }
+  })
+  rows.sort((a,b) => b.rating - a.rating)
+  return rows
+}
+
+/* ─────────────────────────────────────────────────────────
+   UI
    ───────────────────────────────────────────────────────── */
 function Nav() {
   return (
@@ -142,6 +240,7 @@ function Nav() {
           <a href="#ranking" className="text-slate-600 hover:text-slate-900">Ranking</a>
           <a href="#hof" className="text-slate-600 hover:text-slate-900">Hall of Fame</a>
           <a href="#jugadores" className="text-slate-600 hover:text-slate-900">Jugadores</a>
+          <a href="#instagram" className="text-slate-600 hover:text-slate-900">Instagram</a>
         </nav>
         <a href={FORM_URL} target="_blank"
            className="rounded-xl bg-cyan-500 text-white text-sm px-3 py-2 hover:bg-cyan-600 transition">
@@ -152,83 +251,24 @@ function Nav() {
   )
 }
 
-/** Partículas que caen y se desvanecen (no se quedan fijas) */
-function Particles({ count = 70 }) {
-  const arr = React.useMemo(() => Array.from({ length: count }, (_, i) => i), [count])
+function NextPozoCard() {
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      {arr.map((i) => {
-        const left = Math.random() * 100
-        const duration = 8 + Math.random() * 10
-        const size = 2 + Math.random() * 4
-        const delay = Math.random() * 6
-        return (
-          <span
-            key={i}
-            style={{
-              left: `${left}%`,
-              animation: `fall ${duration}s linear ${delay}s infinite`,
-              width: size,
-              height: size,
-            }}
-            className="absolute top-[-10px] rounded-full bg-cyan-500/60"
-          />
-        )
-      })}
-      <style>{`
-        @keyframes fall {
-          0% { transform: translateY(-10px); opacity:.8 }
-          90% { opacity:.05 }
-          100% { transform: translateY(110vh); opacity:0 }
-        }
-      `}</style>
-    </div>
-  )
-}
-
-function NextPozoCard(props: {
-  dateISO: string
-  lugar: string
-  precio?: string
-  plazas?: string
-  formUrl: string
-  bgImageUrl?: string
-}) {
-  const c = useCountdown(props.dateISO)
-  return (
-    <div className="relative rounded-3xl h-56 md:h-72 overflow-hidden border border-slate-200 shadow-inner">
-      <div className="absolute -top-20 -left-20 w-72 h-72 bg-cyan-400/30 blur-3xl rounded-full animate-pulse" />
-      <div className="absolute -bottom-20 -right-20 w-72 h-72 bg-violet-400/30 blur-3xl rounded-full animate-ping" />
-      {props.bgImageUrl && (
-        <img
-          src={resolvePublic(props.bgImageUrl)}
-          alt="Cartel pozo"
-          className="absolute inset-0 w-full h-full object-cover opacity-50"
-        />
-      )}
+    <div className="relative rounded-3xl h-56 md:h-72 overflow-hidden border border-slate-200 shadow-inner bg-gradient-to-br from-cyan-50 to-violet-50">
+      <img src={HERO_POSTER} alt="Cartel pozo" className="absolute inset-0 w-full h-full object-cover opacity-50" />
       <div className="absolute inset-0 bg-gradient-to-tr from-white/70 via-white/30 to-transparent" />
       <div className="relative h-full p-4 md:p-6 flex flex-col justify-between">
         <div>
           <div className="text-xs uppercase tracking-wide text-slate-500">Próximo pozo</div>
-          <div className="mt-1 text-lg font-semibold text-slate-900">
-            {new Date(props.dateISO).toLocaleString('es-ES', {
-              weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
-            })}
-          </div>
-          <div className="mt-1 text-sm text-slate-600">{props.lugar}</div>
+          <div className="mt-1 text-lg font-semibold text-slate-900">Fecha por anunciar</div>
+          <div className="mt-1 text-sm text-slate-600">Polideportivo Municipal</div>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600">
-            {props.precio && <span className="rounded-full bg-white/70 px-2 py-1 border border-slate-200">{props.precio}</span>}
-            {props.plazas && <span className="rounded-full bg-white/70 px-2 py-1 border border-slate-200">{props.plazas}</span>}
+            <span className="rounded-full bg-white/70 px-2 py-1 border border-slate-200">12€ por jugador</span>
+            <span className="rounded-full bg-white/70 px-2 py-1 border border-slate-200">16 plazas</span>
           </div>
         </div>
         <div className="flex items-center justify-between">
-          <div className="font-mono text-slate-800 text-sm md:text-base">
-            {c.done ? '¡En juego!' : `${String(c.d).padStart(2,'0')}d:${String(c.h).padStart(2,'0')}h:${String(c.m).padStart(2,'0')}m:${String(c.s).padStart(2,'0')}s`}
-          </div>
-          <a href={props.formUrl} target="_blank"
-             className="rounded-xl bg-cyan-500 text-white text-xs md:text-sm px-3 py-2 hover:bg-cyan-600 transition">
-            Inscribirme
-          </a>
+          <div className="font-mono text-slate-800 text-sm md:text-base">Publicamos la fecha en Instagram</div>
+          <a href={FORM_URL} target="_blank" className="rounded-xl bg-cyan-500 text-white text-xs md:text-sm px-3 py-2 hover:bg-cyan-600 transition">Inscribirme</a>
         </div>
       </div>
     </div>
@@ -238,7 +278,6 @@ function NextPozoCard(props: {
 function Hero() {
   return (
     <section className="relative">
-      <Particles count={70} />
       <div className="mx-auto max-w-[1100px] px-4 md:px-6 py-14 md:py-20">
         <div className="grid md:grid-cols-2 gap-10 items-center">
           <div>
@@ -247,28 +286,17 @@ function Hero() {
               <br /> rápidos, justos y divertidos
             </h1>
             <p className="mt-4 text-slate-600">
-              Pozos de ~2h en instalaciones municipales. Inscríbete, ve fotos y consulta perfiles de jugadores.
+              Organizamos pozos de ~2h en instalaciones municipales. Inscríbete, ve fotos y consulta perfiles de jugadores.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <a href={FORM_URL} target="_blank"
-                 className="rounded-2xl bg-slate-900 text-white px-5 py-2.5 text-sm hover:-translate-y-0.5 transition">
-                Abrir formulario
-              </a>
-              <a href="#jugadores"
-                 className="rounded-2xl border border-slate-300 px-5 py-2.5 text-sm hover:bg-slate-50 transition">
-                Ver jugadores
-              </a>
+              <a href={FORM_URL} target="_blank" className="rounded-2xl bg-slate-900 text-white px-5 py-2.5 text-sm hover:-translate-y-0.5 transition">Abrir formulario</a>
+              <a href="#jugadores" className="rounded-2xl border border-slate-300 px-5 py-2.5 text-sm hover:bg-slate-50 transition">Ver jugadores</a>
             </div>
+            <p className="mt-3 inline-flex items-center gap-2 text-xs text-slate-500">
+              <span className="inline-block size-2 rounded-full bg-amber-400 animate-pulse" /> Próximo pozo: Fecha por confirmar
+            </p>
           </div>
-
-          <NextPozoCard
-            dateISO="2025-09-15T10:00:00"
-            lugar="Polideportivo Municipal"
-            precio="12€ por jugador"
-            plazas="16 plazas"
-            formUrl={FORM_URL}
-            bgImageUrl={`carteles/pozo1.png`}
-          />
+          <NextPozoCard />
         </div>
       </div>
     </section>
@@ -281,10 +309,7 @@ function Inscripcion() {
       <div className="mx-auto max-w-[1100px] px-4 md:px-6 py-12">
         <h2 className="text-xl font-semibold text-slate-900">Inscripción</h2>
         <p className="text-slate-600 mt-2">Completa el formulario para confirmar tu plaza.</p>
-        <a href={FORM_URL} target="_blank"
-           className="mt-4 inline-block rounded-xl bg-cyan-500 text-white px-5 py-2.5 text-sm hover:bg-cyan-600 transition">
-          Abrir formulario
-        </a>
+        <a href={FORM_URL} target="_blank" className="mt-4 inline-block rounded-xl bg-cyan-500 text-white px-5 py-2.5 text-sm hover:bg-cyan-600 transition">Abrir formulario</a>
       </div>
     </section>
   )
@@ -296,18 +321,11 @@ function Redes() {
       <div className="mx-auto max-w-[1100px] px-4 md:px-6 py-12">
         <h2 className="text-xl font-semibold text-slate-900">Redes</h2>
         <p className="text-slate-600 mt-2">Síguenos y etiqueta tus fotos del pozo 😊</p>
-        <a href={IG_URL} target="_blank"
-           className="mt-4 inline-block rounded-xl border border-slate-300 px-5 py-2.5 text-sm hover:bg-slate-50 transition">
-          Instagram
-        </a>
+        <a href={IG_URL} target="_blank" className="mt-4 inline-block rounded-xl border border-slate-300 px-5 py-2.5 text-sm hover:bg-slate-50 transition">Instagram</a>
       </div>
     </section>
   )
 }
-
-const GALLERY = [
-  { src: `carteles/pozo1.png`, alt: 'Pozo 1' },
-]
 
 function Galeria() {
   return (
@@ -317,11 +335,8 @@ function Galeria() {
         <p className="text-slate-600 mt-2">Las mejores fotos de torneos anteriores.</p>
         <div className="mt-6 grid grid-cols-2 md:grid-cols-3 gap-3">
           {GALLERY.map((g, i) => (
-            <a key={i} href={resolvePublic(g.src)} target="_blank"
-               className="group block rounded-2xl overflow-hidden border border-slate-200">
-              <img src={resolvePublic(g.src)} alt={g.alt}
-                   className="w-full h-40 md:h-48 object-cover group-hover:scale-[1.02] transition"
-                   loading="lazy" />
+            <a key={i} href={g.src} target="_blank" className="group block rounded-2xl overflow-hidden border border-slate-200">
+              <img src={g.src} alt={g.alt} loading="lazy" className="w-full h-40 md:h-48 object-cover group-hover:scale-[1.02] transition" />
             </a>
           ))}
         </div>
@@ -330,74 +345,68 @@ function Galeria() {
   )
 }
 
-function Ranking({ players }: { players: Player[] }) {
-  const ranked = React.useMemo(
-    () =>
-      [...players]
-        .filter((p) => typeof p.rating === 'number')
-        .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
-        .slice(0, 10),
-    [players]
-  )
-  if (!ranked.length) return null
+function RankingTable({ rows }: { rows: {player: Player; rating: number; wins: number; losses: number}[] }) {
+  if (!rows.length) return null
   return (
     <section id="ranking" className="border-t border-slate-200">
       <div className="mx-auto max-w-[1100px] px-4 md:px-6 py-12">
         <h2 className="text-xl font-semibold text-slate-900">Ranking</h2>
-        <p className="text-slate-600 mt-2">Top 10 por rating.</p>
-        <ol className="mt-6 space-y-3">
-          {ranked.map((p, i) => (
-            <li key={p.id}
-                className={`rounded-2xl border p-4 flex items-center gap-3 ${
-                  i < 3 ? 'border-yellow-400 shadow-[0_0_20px_rgba(255,215,0,0.45)]' : 'border-slate-200'
-                }`}>
-              <span className="w-8 text-center text-slate-500">{i + 1}</span>
-              <img src={resolvePublic(p.photo) || 'https://i.pravatar.cc/100'}
-                   className="w-10 h-10 rounded-full object-cover" />
-              <div className="flex-1 min-w-0">
-                <div className="font-medium text-slate-900 truncate">{p.name}</div>
-                <div className="text-xs text-slate-500 truncate">
-                  {p.level}{p.club ? ` · ${p.club}` : ''}
-                </div>
-              </div>
-              <div className="font-mono text-sm">{p.rating?.toFixed(0) ?? '-'}</div>
-            </li>
-          ))}
-        </ol>
+        <p className="text-slate-600 mt-2">Generado desde <code>leaderboard.csv</code> (auto-detección de esquema).</p>
+        <div className="mt-6 overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="text-left text-slate-500">
+                <th className="py-2 pr-4">Pos</th>
+                <th className="py-2 pr-4">Jugador</th>
+                <th className="py-2 pr-4">Nivel</th>
+                <th className="py-2 pr-4">Club</th>
+                <th className="py-2 pr-4">Wins</th>
+                <th className="py-2 pr-4">Losses</th>
+                <th className="py-2">Rating</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={r.player.id} className="border-t border-slate-200">
+                  <td className="py-2 pr-4">{i + 1}</td>
+                  <td className="py-2 pr-4">{r.player.name}</td>
+                  <td className="py-2 pr-4">{r.player.level}</td>
+                  <td className="py-2 pr-4">{r.player.club || "—"}</td>
+                  <td className="py-2 pr-4">{r.wins}</td>
+                  <td className="py-2 pr-4">{r.losses}</td>
+                  <td className="py-2 font-medium">{r.rating}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
   )
 }
 
-function HallOfFame({ players }: { players: Player[] }) {
-  const hof = React.useMemo(
-    () => [...players].filter((p) => (p.rating ?? 0) >= 90).slice(0, 8),
-    [players]
-  )
-  if (!hof.length) return null
+function HallOfFame({ rows }: { rows: {player: Player; rating: number; wins: number; losses: number}[] }) {
+  const top3 = rows.slice(0,3)
+  if (!top3.length) return null
   return (
-    <section id="hof" className="border-t border-slate-200">
+    <section id="hof" className="border-t border-slate-200 bg-gradient-to-b from-amber-50/30 to-white">
       <div className="mx-auto max-w-[1100px] px-4 md:px-6 py-12">
         <h2 className="text-xl font-semibold text-slate-900">Hall of Fame</h2>
-        <p className="text-slate-600 mt-2">Jugadores legendarios del pozo.</p>
-        <div className="mt-6 grid sm:grid-cols-2 md:grid-cols-4 gap-4">
-          {hof.map((p) => (
-            <div key={p.id}
-                 className="relative rounded-2xl border border-yellow-400 p-4 overflow-hidden group
-                            shadow-[0_0_25px_rgba(255,215,0,0.5)]">
-              <div className="absolute inset-0 bg-gradient-to-br from-yellow-200/20 to-transparent pointer-events-none" />
+        <p className="text-slate-600 mt-2">Los 3 con mayor rating actual.</p>
+        <div className="mt-6 grid sm:grid-cols-3 gap-4">
+          {top3.map((r, i) => (
+            <div key={r.player.id} className="relative overflow-hidden rounded-2xl border border-amber-300/60 bg-white p-4">
+              <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-amber-200/60 blur-2xl" />
               <div className="flex items-center gap-3">
-                <img src={resolvePublic(p.photo) || 'https://i.pravatar.cc/100'}
-                     className="w-12 h-12 rounded-full object-cover ring-2 ring-yellow-400" />
+                <img src={resolvePhoto(r.player.photo) || "https://i.pravatar.cc/100"} alt={r.player.name} className="w-14 h-14 rounded-full object-cover ring-2 ring-amber-400/70" />
                 <div className="min-w-0">
-                  <div className="font-semibold text-slate-900 truncate">{p.name}</div>
-                  <div className="text-xs text-slate-500 truncate">
-                    {p.level}{p.club ? ` · ${p.club}` : ''} · Rating {p.rating?.toFixed(0)}
-                  </div>
+                  <div className="font-semibold text-slate-900 truncate">#{i + 1} {r.player.name}</div>
+                  <div className="text-xs text-slate-500">{r.player.level} · {r.player.club || "—"}</div>
                 </div>
               </div>
-              <div className="absolute -inset-1 opacity-0 group-hover:opacity-100 transition pointer-events-none
-                              bg-[radial-gradient(ellipse_at_center,rgba(255,215,0,0.25),transparent_60%)]" />
+              <div className="mt-3 text-sm">
+                <span className="font-medium text-amber-700">Rating:</span> <span className="font-semibold">{r.rating}</span> · <span className="text-slate-600">W{r.wins}/L{r.losses}</span>
+              </div>
             </div>
           ))}
         </div>
@@ -406,31 +415,27 @@ function HallOfFame({ players }: { players: Player[] }) {
   )
 }
 
-/** Tarjeta con flip (frontal datos; reverso últimos 3 partidos) */
 function Jugadores({ players, matches }: { players: Player[]; matches: Match[] }) {
-  const [q, setQ] = React.useState('')
-  const byId = React.useMemo(() => new Map(players.map(p => [p.id, p])), [players])
+  const byPlayer: Record<string, Match[]> = React.useMemo(() => {
+    const m: Record<string, Match[]> = {}
+    matches.forEach(match => {
+      ;[match.p1, match.p2].forEach(id => {
+        if (!m[id]) m[id] = []
+        m[id].push(match)
+      })
+    })
+    return m
+  }, [matches])
 
+  const [q, setQ] = React.useState("")
   const list = React.useMemo(() => {
     const t = q.trim().toLowerCase()
     if (!t) return players
-    return players.filter(
-      (p) =>
-        p.name.toLowerCase().includes(t) ||
-        (p.level || '').toLowerCase().includes(t) ||
-        (p.club || '').toLowerCase().includes(t)
-    )
+    return players.filter(p =>
+      p.name.toLowerCase().includes(t) ||
+      (p.level || "").toLowerCase().includes(t) ||
+      (p.club || "").toLowerCase().includes(t))
   }, [q, players])
-
-  const lastMatchesFor = React.useCallback((pid: string) => {
-    const ms = matches.filter(m => m.p1 === pid || m.p2 === pid).slice(0, 3)
-    return ms.map(m => {
-      const oppId = m.p1 === pid ? m.p2 : m.p1
-      const opp = byId.get(oppId)?.name || '—'
-      const res = m.winner ? (m.winner === pid ? 'W' : 'L') : ''
-      return { ...m, opp, res }
-    })
-  }, [matches, byId])
 
   return (
     <section id="jugadores" className="border-t border-slate-200">
@@ -438,73 +443,54 @@ function Jugadores({ players, matches }: { players: Player[]; matches: Match[] }
         <div className="flex items-end justify-between gap-4">
           <div>
             <h2 className="text-xl font-semibold text-slate-900">Jugadores</h2>
-            <p className="text-slate-600 mt-2">Pasa el ratón (o toca) para ver sus últimos partidos.</p>
+            <p className="text-slate-600 mt-2">Pasa el ratón para ver sus últimos partidos.</p>
           </div>
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar…"
-            className="w-48 md:w-64 rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-cyan-400"
-          />
+          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar…"
+                 className="w-48 md:w-64 rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-cyan-400" />
         </div>
 
-        {/* CSS del flip */}
         <style>{`
-          .flip {
-            perspective: 1000px;
-          }
-          .flip-inner {
-            transform-style: preserve-3d;
-            transition: transform .6s;
-          }
-          .flip:hover .flip-inner,
-          .flip:focus-within .flip-inner {
-            transform: rotateY(180deg);
-          }
-          .flip-face {
-            backface-visibility: hidden;
-          }
-          .flip-back {
-            transform: rotateY(180deg);
-          }
+          .flip { perspective: 1000px; }
+          .flip-inner { transform-style: preserve-3d; transition: transform .6s; }
+          .flip:hover .flip-inner, .flip:focus-within .flip-inner { transform: rotateY(180deg); }
+          .flip-face { backface-visibility: hidden; }
+          .flip-back { transform: rotateY(180deg); }
         `}</style>
 
         <div className="mt-6 grid sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {list.map((p) => {
-            const top = (p.rating ?? 0) >= 90 || p.level?.toLowerCase() === 'avanzado'
-            const last3 = lastMatchesFor(p.id)
+          {list.map(p => {
+            const recent = (byPlayer[p.id] || []).slice(0,3)
             return (
-              <div key={p.id} className={`flip rounded-2xl border ${top ? 'border-yellow-400 shadow-[0_0_18px_rgba(255,215,0,0.45)]' : 'border-slate-200'}`}>
+              <div key={p.id} className="flip rounded-2xl border border-slate-200">
                 <div className="flip-inner relative p-4 min-h-[140px]">
-                  {/* Front */}
                   <div className="flip-face absolute inset-0 p-4 flex gap-3 items-center">
-                    <img src={resolvePublic(p.photo) || 'https://i.pravatar.cc/100'}
-                         alt={p.name}
+                    <img src={resolvePhoto(p.photo) || "https://i.pravatar.cc/100"} alt={p.name}
                          className="w-14 h-14 rounded-full object-cover" />
                     <div className="min-w-0">
                       <div className="font-medium text-slate-900 truncate">{p.name}</div>
                       <div className="text-xs text-slate-500 truncate">
                         {p.level}{p.club ? ` · ${p.club}` : ''}{typeof p.rating === 'number' ? ` · ${p.rating.toFixed(0)}` : ''}
                       </div>
-                      {p.ig && (
-                        <a href={`https://instagram.com/${p.ig.replace('@','')}`} target="_blank"
-                           className="text-xs text-cyan-600 hover:underline">{p.ig}</a>
-                      )}
+                      {p.ig && <a href={`https://instagram.com/${p.ig.replace('@','')}`} target="_blank" className="text-xs text-cyan-600 hover:underline">{p.ig}</a>}
                     </div>
                   </div>
-                  {/* Back */}
-                  <div className="flip-face flip-back absolute inset-0 p-4">
-                    <div className="text-sm font-semibold text-slate-900 mb-2">Partidos recientes</div>
-                    {last3.length ? (
+
+                  <div className="flip-face flip-back absolute inset-0 p-4 border border-slate-200 bg-slate-50">
+                    <div className="text-sm font-medium text-slate-800 mb-1">Últimos partidos</div>
+                    {recent.length ? (
                       <ul className="space-y-1">
-                        {last3.map(m => (
-                          <li key={m.id} className="text-xs text-slate-600">
-                            <span className={m.res === 'W' ? 'text-emerald-600 font-medium' : 'text-rose-600 font-medium'}>
-                              {m.res || '·'}
-                            </span>{' '}
-                            vs {m.opp} {m.score ? `· ${m.score}` : ''}{m.date ? ` · ${new Date(m.date).toLocaleDateString('es-ES')}` : ''}
-                          </li>
-                        ))}
+                        {recent.map(m => {
+                          const youWin = m.winner === p.id
+                          const vs = m.p1 === p.id ? m.p2 : m.p1
+                          return (
+                            <li key={m.id} className="text-xs text-slate-600">
+                              <span className={youWin ? "text-emerald-600 font-medium" : "text-rose-600 font-medium"}>
+                                {youWin ? "W" : "L"}
+                              </span>{" "}
+                              vs {vs}{m.score ? ` · ${m.score}` : ""}{m.date ? ` · ${new Date(m.date).toLocaleDateString('es-ES')}` : ""}
+                            </li>
+                          )
+                        })}
                       </ul>
                     ) : (
                       <div className="text-xs text-slate-500">Sin registros aún.</div>
@@ -520,41 +506,28 @@ function Jugadores({ players, matches }: { players: Player[]; matches: Match[] }
   )
 }
 
-/* (Opcional) Feed IG – desactivado por defecto */
 function InstagramFeed() {
-  const [items, setItems] = React.useState<{img:string; alt?:string; href?:string}[]>([])
-  React.useEffect(() => {
-    ;(async () => {
-      try {
-        const url = `${import.meta.env.BASE_URL}ig.json`
-        const resp = await fetch(url)
-        if (!resp.ok) return
-        const data = await resp.json()
-        setItems((Array.isArray(data) ? data : []).map(it => ({
-          img: resolvePublic(it.img), alt: it.alt || 'Instagram', href: it.href
-        })))
-      } catch {}
-    })()
-  }, [])
-  if (!items.length) return null
+  const items = useInstagram()
+  if (!SHOW_IG || !items.length) return null
   return (
-    <section id="ig" className="border-t border-slate-200">
+    <section id="instagram" className="border-t border-slate-200">
       <div className="mx-auto max-w-[1100px] px-4 md:px-6 py-12">
         <h2 className="text-xl font-semibold text-slate-900">Menciónanos en Instagram</h2>
-        <p className="text-slate-600 mt-2">Comparte con el hashtag y/o menciona la cuenta.</p>
-        <div className="mt-6 grid sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {items.map((it, i) => (
-            it.href ? (
-              <a key={i} href={it.href} target="_blank" rel="noreferrer"
-                 className="group block rounded-2xl overflow-hidden border border-slate-200 bg-slate-50">
-                <img src={it.img} alt={it.alt} className="w-full h-56 object-cover group-hover:scale-[1.02] transition" />
-              </a>
-            ) : (
-              <div key={i} className="group block rounded-2xl overflow-hidden border border-slate-200 bg-slate-50">
-                <img src={it.img} alt={it.alt} className="w-full h-56 object-cover group-hover:scale-[1.02] transition" />
+        <p className="text-slate-600 mt-2">Comparte la publicación con nosotros para aparecer aquí.</p>
+        <div className="mt-6 grid grid-cols-2 md:grid-cols-3 gap-3">
+          {items.map((it, i) => {
+            const img = /^https?:\/\//i.test(it.img)
+              ? it.img
+              : `${import.meta.env.BASE_URL}${it.img.replace(/^\/+/, "")}`
+            const card = (
+              <div className="group block rounded-2xl overflow-hidden border border-slate-200 bg-slate-100">
+                <img src={img} alt={it.alt || "Instagram"} className="w-full h-48 object-cover group-hover:scale-[1.02] transition" loading="lazy" />
               </div>
             )
-          ))}
+            return it.href ? (
+              <a key={i} href={it.href} target="_blank" rel="noreferrer">{card}</a>
+            ) : (<div key={i}>{card}</div>)
+          })}
         </div>
       </div>
     </section>
@@ -571,12 +544,18 @@ function Footer() {
   )
 }
 
-/* ─────────────────────────────────────────────────────────
-   App
-   ───────────────────────────────────────────────────────── */
 export default function App() {
   const players = usePlayers()
-  const matches = useMatches()
+  const { matches, table } = useLeaderboard()
+
+  // Decide ranking source
+  const ranking = React.useMemo(() => {
+    if (matches.length) return computeRankingFromMatches(players, matches)
+    if (table.length)    return computeRankingFromTable(players, table)
+    // por defecto: ordena por rating existente o nombre
+    return players.map(p => ({ player: p, rating: p.rating ?? 1000, wins: 0, losses: 0 }))
+                  .sort((a,b) => b.rating - a.rating)
+  }, [players, matches, table])
 
   return (
     <div className="bg-white text-slate-900">
@@ -585,10 +564,10 @@ export default function App() {
       <Inscripcion />
       <Redes />
       <Galeria />
-      <Ranking players={players} />
-      <HallOfFame players={players} />
+      <RankingTable rows={ranking} />
+      <HallOfFame rows={ranking} />
       <Jugadores players={players} matches={matches} />
-      {SHOW_IG && <InstagramFeed />}
+      <InstagramFeed />
       <Footer />
     </div>
   )
