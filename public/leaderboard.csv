@@ -1,4 +1,4 @@
-id,name,points,wins,ig,photo
-1,Alejandro Sechi,80,2,@secci_tennis,jugadores/alejandrosechi.png
-2,Julia Escorial,85,3,@juls_es_00,jugadores/juliaescorial.png
-3,Jugador Prueba,60,1,@demo,https://i.pravatar.cc/100?img=12
+id,date,p1,p2,score,winner,round
+m1,2025-09-01,1,2,6-4 3-6 10-8,1,SF
+m2,2025-08-28,2,p4,4-6 6-3 9-11,p4,QF
+m3,2025-08-20,1,p3,6-2 6-4,1,Group
