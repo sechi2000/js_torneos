@@ -548,8 +548,8 @@ function IGFeedStatic() {
   return (
     <section id="ig" className="border-t border-slate-200">
       <div className="mx-auto max-w-[1100px] px-4 md:px-6 py-12">
-        <h2 className="text-xl font-semibold text-slate-900">#JSPadel en Instagram</h2>
-        <p className="text-slate-600 mt-2">Comparte con el hashtag para aparecer aquí</p>
+        <h2 className="text-xl font-semibold text-slate-900">Mencionanos en Instagram</h2>
+        <p className="text-slate-600 mt-2">Comparte la publicación con nosotros para aparecer aquí</p>
         <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
           {urls.map((u, i) => (
             <iframe
