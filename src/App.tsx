@@ -220,9 +220,9 @@ function Hero() {
 
           {/* Tarjeta en la columna derecha */}
           <NextPozoCard
-            dateISO="2025-09-15T18:00:00"
+            dateISO="2025-09-15T10:00:00"
             lugar="Polideportivo Municipal"
-            precio="8€ por jugador"
+            precio="12€ por jugador"
             plazas="16 plazas"
             formUrl={FORM_URL}
             bgImageUrl={`${import.meta.env.BASE_URL}carteles/pozo1.png`}
