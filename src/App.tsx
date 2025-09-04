@@ -2,7 +2,7 @@ import React from 'react'
 import { fetchCSV } from './utils/csv'
 
 /* ─────────────────────────────────────────────────────────
-   SCROLL EXTRAS: barra progreso, reveal, parallax
+   Helpers visuales (scroll bar, reveal, etc.)
    ───────────────────────────────────────────────────────── */
 function ScrollProgress() {
   const [p, setP] = React.useState(0)
@@ -19,606 +19,235 @@ function ScrollProgress() {
   }, [])
   return (
     <div className="fixed inset-x-0 top-0 z-[60] h-0.5 bg-transparent">
-      <div
-        className="h-full bg-gradient-to-r from-cyan-500 to-violet-500 transition-[width] duration-150 ease-out"
-        style={{ width: `${p * 100}%` }}
-      />
+      <div className="h-full bg-gradient-to-r from-cyan-500 to-violet-500 transition-[width]" style={{ width: `${p*100}%` }}/>
     </div>
   )
 }
 
-function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
-  const ref = React.useRef<HTMLDivElement>(null)
-  const [show, setShow] = React.useState(false)
-  React.useEffect(() => {
-    const el = ref.current!
-    const io = new IntersectionObserver(
-      (entries) => entries.forEach((e) => e.isIntersecting && setShow(true)),
-      { threshold: 0.12 }
-    )
-    io.observe(el)
-    return () => io.disconnect()
-  }, [])
+function Reveal({ children, delay=0 }:{children:React.ReactNode;delay?:number}) {
+  const ref=React.useRef<HTMLDivElement>(null)
+  const [show,setShow]=React.useState(false)
+  React.useEffect(()=>{
+    const io=new IntersectionObserver(e=>e.forEach(v=>v.isIntersecting&&setShow(true)),{threshold:0.12})
+    if(ref.current) io.observe(ref.current)
+    return()=>io.disconnect()
+  },[])
   return (
-    <div
-      ref={ref}
-      style={{ transitionDelay: `${delay}ms` }}
-      className={[
-        'will-change-transform will-change-opacity',
-        'transition duration-700 ease-out',
-        show ? 'opacity-100 translate-y-0 blur-0' : 'opacity-0 translate-y-6 blur-[2px]'
-      ].join(' ')}
-    >
+    <div ref={ref} style={{transitionDelay:`${delay}ms`}}
+      className={`transition duration-700 ease-out will-change-transform will-change-opacity ${show?'opacity-100 translate-y-0':'opacity-0 translate-y-6'}`}>
       {children}
-    </div>
-  )
-}
-
-function ParallaxDecor() {
-  const ref = React.useRef<HTMLDivElement>(null)
-  React.useEffect(() => {
-    let id = 0
-    const onScroll = () => {
-      const y = window.scrollY || 0
-      ref.current?.style.setProperty('--t1', `${y * 0.06}px`)
-      ref.current?.style.setProperty('--t2', `${y * 0.03}px`)
-    }
-    const loop = () => { onScroll(); id = requestAnimationFrame(loop) }
-    id = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(id)
-  }, [])
-  return (
-    <div ref={ref} aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div
-        className="absolute -top-24 -right-20 w-[36rem] h-[36rem] rounded-full opacity-30 blur-2xl"
-        style={{
-          transform: 'translateY(var(--t1,0))',
-          background:
-            'radial-gradient(closest-side, rgba(14,165,233,.35), rgba(14,165,233,0) 70%)'
-        }}
-      />
-      <div
-        className="absolute -bottom-20 -left-24 w-[30rem] h-[30rem] rounded-full opacity-30 blur-2xl"
-        style={{
-          transform: 'translateY(calc(var(--t2,0) * -1))',
-          background:
-            'radial-gradient(closest-side, rgba(139,92,246,.35), rgba(139,92,246,0) 70%)'
-        }}
-      />
     </div>
   )
 }
 
 /* ─────────────────────────────────────────────────────────
-   EPIC MODE: Partículas + Botón magnético + Confetti
+   Efectos extra: partículas, botones magnéticos, confetti
    ───────────────────────────────────────────────────────── */
-// Campo de partículas reactivo al cursor (canvas)
-function ParticleField() {
-  const ref = React.useRef<HTMLCanvasElement>(null)
-  const mouse = React.useRef({ x: 0, y: 0, has: false })
-  React.useEffect(() => {
-    const canvas = ref.current!
-    const ctx = canvas.getContext('2d')!
-    let w = canvas.width = canvas.offsetWidth
-    let h = canvas.height = canvas.offsetHeight
-
-    // partículitas
-    const COUNT = Math.floor((w * h) / 18000) + 60
-    const P = Array.from({ length: COUNT }, () => ({
-      x: Math.random() * w,
-      y: Math.random() * h,
-      vx: (Math.random() - 0.5) * 0.3,
-      vy: (Math.random() - 0.5) * 0.3,
-      r: Math.random() * 1.6 + 0.6,
-    }))
-
-    const onMouse = (e: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect()
-      mouse.current.x = e.clientX - rect.left
-      mouse.current.y = e.clientY - rect.top
-      mouse.current.has = true
-    }
-    const onLeave = () => { mouse.current.has = false }
-    const onResize = () => {
-      w = canvas.width = canvas.offsetWidth
-      h = canvas.height = canvas.offsetHeight
-    }
-
-    canvas.addEventListener('mousemove', onMouse)
-    canvas.addEventListener('mouseleave', onLeave)
-    window.addEventListener('resize', onResize)
-
-    let raf = 0
-    const loop = () => {
-      ctx.clearRect(0, 0, w, h)
-
-      // fondo sutil
-      const g = ctx.createLinearGradient(0, 0, w, h)
-      g.addColorStop(0, 'rgba(14,165,233,0.04)')
-      g.addColorStop(1, 'rgba(139,92,246,0.04)')
-      ctx.fillStyle = g
-      ctx.fillRect(0, 0, w, h)
-
-      // dibuja puntos
-      for (const p of P) {
-        // atracción/repulsión suave
-        if (mouse.current.has) {
-          const dx = p.x - mouse.current.x
-          const dy = p.y - mouse.current.y
-          const d2 = dx * dx + dy * dy
-          const f = Math.min(60_000 / (d2 + 1), 0.8) // límite
-          p.vx += (dx / Math.sqrt(d2 + 1)) * f * -0.006
-          p.vy += (dy / Math.sqrt(d2 + 1)) * f * -0.006
-        }
-
-        p.x += p.vx; p.y += p.vy
-        // “rebote” suave en bordes
-        if (p.x < 0 || p.x > w) p.vx *= -1
-        if (p.y < 0 || p.y > h) p.vy *= -1
-
-        ctx.beginPath()
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
-        ctx.fillStyle = 'rgba(30,41,59,0.6)' // slate-800 suave
-        ctx.fill()
-      }
-
-      // líneas cercanas
-      ctx.lineWidth = 0.6
-      for (let i = 0; i < P.length; i++) {
-        for (let j = i + 1; j < P.length; j++) {
-          const a = P[i], b = P[j]
-          const dx = a.x - b.x, dy = a.y - b.y
-          const d2 = dx * dx + dy * dy
-          if (d2 < 140 * 140) {
-            const alpha = 1 - (Math.sqrt(d2) / 140)
-            ctx.strokeStyle = `rgba(14,165,233,${alpha * 0.25})` // cyan
-            ctx.beginPath()
-            ctx.moveTo(a.x, a.y)
-            ctx.lineTo(b.x, b.y)
-            ctx.stroke()
-          }
-        }
-      }
-
-      raf = requestAnimationFrame(loop)
-    }
-    raf = requestAnimationFrame(loop)
-
-    return () => {
-      cancelAnimationFrame(raf)
-      window.removeEventListener('resize', onResize)
-      canvas.removeEventListener('mousemove', onMouse)
-      canvas.removeEventListener('mouseleave', onLeave)
-    }
-  }, [])
-
-  return (
-    <div className="absolute inset-0 -z-[1] overflow-hidden rounded-3xl">
-      <canvas ref={ref} className="w-full h-full" />
-    </div>
-  )
-}
-
-// Botón con efecto imán (hover 3D sutil + follow)
-function MagneticButton({ href, children, className = '', ...rest }:{
-  href: string; children: React.ReactNode; className?: string
-} & React.HTMLAttributes<HTMLAnchorElement>) {
-  const ref = React.useRef<HTMLAnchorElement>(null)
-  React.useEffect(() => {
-    const el = ref.current!
-    const onMove = (e: MouseEvent) => {
-      const r = el.getBoundingClientRect()
-      const x = e.clientX - (r.left + r.width/2)
-      const y = e.clientY - (r.top + r.height/2)
-      el.style.transform = `translate(${x * 0.06}px, ${y * 0.06}px) rotateX(${(-y)*0.02}deg) rotateY(${x*0.02}deg)`
-    }
-    const onLeave = () => { el.style.transform = 'translate(0,0) rotateX(0) rotateY(0)' }
-    el.addEventListener('mousemove', onMove)
-    el.addEventListener('mouseleave', onLeave)
-    return () => { el.removeEventListener('mousemove', onMove); el.removeEventListener('mouseleave', onLeave) }
-  }, [])
-  return (
-    <a
-      ref={ref}
-      href={href}
-      className={`rounded-2xl bg-slate-900 text-white px-5 py-2.5 text-sm transition will-change-transform ${className}`}
-      {...rest}
-    >
-      {children}
-    </a>
-  )
-}
-
-// Confetti discreto cuando #jugadores entra en viewport
-function SectionConfetti({ targetId = 'jugadores' }) {
-  const ref = React.useRef<HTMLCanvasElement>(null)
-  React.useEffect(() => {
-    const el = document.getElementById(targetId)
-    if (!el) return
-    const canvas = ref.current!
-    const ctx = canvas.getContext('2d')!
-    let w = canvas.width = window.innerWidth
-    let h = canvas.height = window.innerHeight
-
-    const onResize = () => { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight }
-    window.addEventListener('resize', onResize)
-
-    let active = false, t0 = 0
-    const colors = ['#06b6d4','#0ea5e9','#8b5cf6','#f59e0b','#10b981'] // tailwind vibes
-    const pieces = Array.from({ length: 140 }, () => ({
-      x: Math.random() * w,
-      y: -20 - Math.random() * 200,
-      vy: 2 + Math.random() * 2.5,
-      vx: (Math.random()-0.5) * 1.5,
-      r: 4 + Math.random() * 4,
-      c: colors[Math.floor(Math.random()*colors.length)],
-      rot: Math.random()*Math.PI*2,
-      vr: (Math.random()-0.5)*0.2
-    }))
-
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach((e) => {
-        if (e.isIntersecting && !active) {
-          active = true; t0 = performance.now()
-          requestAnimationFrame(loop)
-          // auto-stop a los 2.5s
-          setTimeout(() => { active = false; ctx.clearRect(0,0,w,h) }, 2500)
-        }
-      })
-    }, { threshold: 0.3 })
-    io.observe(el)
-
-    function loop(t:number) {
-      if (!active) return
+function ParticleField(){
+  const ref=React.useRef<HTMLCanvasElement>(null)
+  React.useEffect(()=>{
+    const c=ref.current!,ctx=c.getContext('2d')!
+    let w=c.width=c.offsetWidth,h=c.height=c.offsetHeight
+    const P=Array.from({length:80},()=>({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-0.5)*0.5,vy:(Math.random()-0.5)*0.5,r:Math.random()*2+1}))
+    const loop=()=>{
       ctx.clearRect(0,0,w,h)
-      for (const p of pieces) {
-        p.y += p.vy
-        p.x += p.vx
-        p.rot += p.vr
-        if (p.y > h + 20) { p.y = -20; p.x = Math.random()*w }
-        ctx.save()
-        ctx.translate(p.x, p.y)
-        ctx.rotate(p.rot)
-        ctx.fillStyle = p.c
-        ctx.fillRect(-p.r, -p.r, p.r*2, p.r*2 * (0.6 + 0.4*Math.sin(t*0.01)))
-        ctx.restore()
+      for(const p of P){
+        p.x+=p.vx;p.y+=p.vy
+        if(p.x<0||p.x>w) p.vx*=-1
+        if(p.y<0||p.y>h) p.vy*=-1
+        ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle='rgba(14,165,233,0.6)';ctx.fill()
       }
       requestAnimationFrame(loop)
     }
-
-    return () => { io.disconnect(); window.removeEventListener('resize', onResize) }
-  }, [targetId])
-
-  return <canvas ref={ref} className="pointer-events-none fixed inset-0 z-[55]" />
+    loop()
+  },[])
+  return <canvas ref={ref} className="absolute inset-0 w-full h-full opacity-40"/>
 }
 
-/* ─────────────────────────────────────────────────────────
-   Tipos y configuración
-   ───────────────────────────────────────────────────────── */
-type Player = {
-  id: string; name: string; level: string; club?: string; ig?: string; photo?: string
+function MagneticButton({href,children}:{href:string;children:React.ReactNode}){
+  const ref=React.useRef<HTMLAnchorElement>(null)
+  React.useEffect(()=>{
+    const el=ref.current!
+    const move=(e:MouseEvent)=>{
+      const r=el.getBoundingClientRect(),x=e.clientX-(r.left+r.width/2),y=e.clientY-(r.top+r.height/2)
+      el.style.transform=`translate(${x*0.05}px,${y*0.05}px)`
+    }
+    const leave=()=>el.style.transform='translate(0,0)'
+    el.addEventListener('mousemove',move);el.addEventListener('mouseleave',leave)
+    return()=>{el.removeEventListener('mousemove',move);el.removeEventListener('mouseleave',leave)}
+  },[])
+  return <a ref={ref} href={href} target="_blank" className="rounded-2xl bg-cyan-500 px-4 py-2 text-white hover:bg-cyan-600 transition">{children}</a>
 }
 
-const FORM_URL =
-  'https://docs.google.com/forms/d/e/1FAIpQLSepjrGlEfJqq8Tg4vFsqw7Twh_TbAvApchG89qXU4UktgYihw/viewform?usp=header'
-const IG_URL = 'https://www.instagram.com/js_torneos/'
-
-const GALLERY: { src: string; alt: string }[] = [
-  { src: `${import.meta.env.BASE_URL}carteles/pozo1.png`, alt: 'Pozo 1' },
-]
-
-/* ─────────────────────────────────────────────────────────
-   Helpers
-   ───────────────────────────────────────────────────────── */
-function resolvePhoto(url?: string) {
-  if (!url) return ''
-  if (/^https?:\/\//i.test(url)) return url
-  const clean = url.startsWith('/') ? url.slice(1) : url
-  return `${import.meta.env.BASE_URL}${clean}`
-}
-function useCountdown(targetISO: string) {
-  const target = React.useMemo(() => new Date(targetISO).getTime(), [targetISO])
-  const [ms, setMs] = React.useState(() => Math.max(0, target - Date.now()))
-  React.useEffect(() => {
-    const id = setInterval(() => setMs(Math.max(0, target - Date.now())), 1000)
-    return () => clearInterval(id)
-  }, [target])
-  const total = Math.floor(ms / 1000)
-  const d = Math.floor(total / 86400)
-  const h = Math.floor((total % 86400) / 3600)
-  const m = Math.floor((total % 3600) / 60)
-  const s = total % 60
-  return { d, h, m, s, done: ms <= 0 }
-}
-
-/* ─────────────────────────────────────────────────────────
-   Datos: jugadores desde CSV (/public/players.csv)
-   ───────────────────────────────────────────────────────── */
-function usePlayers() {
-  const [players, setPlayers] = React.useState<Player[]>([])
-  React.useEffect(() => {
-    ;(async () => {
-      try {
-        const url = `${import.meta.env.BASE_URL}players.csv`
-        const rows = await fetchCSV(url)
-        const mapped = rows.map((r: any, i: number): Player => ({
-          id: r.id || String(i),
-          name: r.name || 'Jugador',
-          level: r.level || '',
-          club: r.club || '',
-          ig: r.ig || '',
-          photo: r.photo || '',
-        }))
-        setPlayers(mapped)
-      } catch (e) {
-        console.error('Error CSV', e)
-        setPlayers([])
+function SectionConfetti({targetId='jugadores'}){
+  const ref=React.useRef<HTMLCanvasElement>(null)
+  React.useEffect(()=>{
+    const el=document.getElementById(targetId);if(!el) return
+    const c=ref.current!,ctx=c.getContext('2d')!;let w=c.width=window.innerWidth,h=c.height=window.innerHeight
+    const parts=Array.from({length:80},()=>({x:Math.random()*w,y:-20,vx:(Math.random()-0.5)*2,vy:2+Math.random()*3,c:`hsl(${Math.random()*360},80%,60%)`}))
+    const io=new IntersectionObserver(e=>{
+      if(e[0].isIntersecting){
+        const t0=Date.now(),loop=()=>{
+          ctx.clearRect(0,0,w,h)
+          for(const p of parts){p.x+=p.vx;p.y+=p.vy;if(p.y>h)p.y=-20;ctx.fillStyle=p.c;ctx.fillRect(p.x,p.y,5,5)}
+          if(Date.now()-t0<2500) requestAnimationFrame(loop)
+        };loop()
       }
-    })()
-  }, [])
-  return players
+    },{threshold:0.3})
+    io.observe(el)
+  },[targetId])
+  return <canvas ref={ref} className="fixed inset-0 pointer-events-none z-50"/>
 }
 
 /* ─────────────────────────────────────────────────────────
-   UI
+   Tipos y datos
    ───────────────────────────────────────────────────────── */
-function Nav() {
-  return (
-    <header className="sticky top-0 z-40 w-full backdrop-blur bg-white/70 border-b border-slate-200">
-      <div className="mx-auto max-w-[1100px] px-4 md:px-6 h-14 flex items-center justify-between">
-        <a href="#" className="font-semibold text-slate-800">J &amp; S Padel</a>
-        <nav className="hidden md:flex gap-6 text-sm">
-          <a href="#inscripcion" className="text-slate-600 hover:text-slate-900">Inscripción</a>
-          <a href="#redes" className="text-slate-600 hover:text-slate-900">Redes</a>
-          <a href="#galeria" className="text-slate-600 hover:text-slate-900">Galería</a>
-          <a href="#jugadores" className="text-slate-600 hover:text-slate-900">Jugadores</a>
-        </nav>
-        <MagneticButton href={FORM_URL} target="_blank">
-          Inscríbete
-        </MagneticButton>
-      </div>
-    </header>
-  )
+type Player={id:string;name:string;level:string;club?:string;ig?:string;photo?:string}
+type LBRow={id:string;name:string;points:number;wins:number;ig?:string;photo?:string}
+
+const FORM_URL='https://docs.google.com/forms/d/e/1FAIpQLSepjrGlEfJqq8Tg4vFsqw7Twh_TbAvApchG89qXU4UktgYihw/viewform?usp=header'
+const IG_URL='https://www.instagram.com/js_torneos/'
+const GALLERY=[{src:`${import.meta.env.BASE_URL}carteles/pozo1.png`,alt:'Pozo 1'}]
+
+function resolvePhoto(url?:string){if(!url)return'';if(/^https?:/.test(url))return url;return `${import.meta.env.BASE_URL}${url}`}
+
+function usePlayers(){
+  const[p,setP]=React.useState<Player[]>([])
+  React.useEffect(()=>{(async()=>{
+    try{const d=await fetchCSV(`${import.meta.env.BASE_URL}players.csv`)
+      setP(d.map((r:any,i:number)=>({id:r.id||String(i),name:r.name||'Jugador',level:r.level||'',club:r.club||'',ig:r.ig||'',photo:r.photo||''})))
+    }catch(e){setP([])}})()},[])
+  return p
 }
 
-// Tarjeta “Próximo pozo” para el hero
-function NextPozoCard(props: {
-  dateISO: string; lugar: string; precio?: string; plazas?: string; formUrl: string; bgImageUrl?: string
-}) {
-  const c = useCountdown(props.dateISO)
-  return (
-    <div className="relative rounded-3xl h-56 md:h-72 overflow-hidden border border-slate-200 shadow-inner bg-gradient-to-br from-cyan-50 to-violet-50">
-      <ParticleField /> {/* fondo dinámico tech */}
-      {props.bgImageUrl && (
-        <img
-          src={props.bgImageUrl}
-          alt="Cartel pozo"
-          className="absolute inset-0 w-full h-full object-cover opacity-35 mix-blend-multiply"
-        />
-      )}
-      <div className="absolute inset-0 bg-gradient-to-tr from-white/70 via-white/30 to-transparent" />
-      <div className="relative h-full p-4 md:p-6 flex flex-col justify-between">
+function useLeaderboard(){
+  const[r,setR]=React.useState<LBRow[]>([])
+  React.useEffect(()=>{(async()=>{
+    try{const d=await fetchCSV(`${import.meta.env.BASE_URL}leaderboard.csv`)
+      const m=d.map((r:any,i:number)=>({id:r.id||String(i),name:r.name||'Jugador',points:+r.points||0,wins:+r.wins||0,ig:r.ig||'',photo:r.photo||''}))
+      m.sort((a,b)=>b.points-a.points);setR(m)
+    }catch(e){setR([])}})()},[])
+  return r
+}
+
+/* ─────────────────────────────────────────────────────────
+   UI secciones
+   ───────────────────────────────────────────────────────── */
+function Nav(){
+  return(<header className="sticky top-0 z-40 bg-white/70 backdrop-blur border-b border-slate-200">
+    <div className="max-w-[1100px] mx-auto px-4 md:px-6 h-14 flex justify-between items-center">
+      <a href="#" className="font-bold">J & S Padel</a>
+      <nav className="hidden md:flex gap-6 text-sm">
+        <a href="#inscripcion">Inscripción</a>
+        <a href="#redes">Redes</a>
+        <a href="#galeria">Galería</a>
+        <a href="#ranking">Ranking</a>
+        <a href="#jugadores">Jugadores</a>
+      </nav>
+      <MagneticButton href={FORM_URL}>Inscríbete</MagneticButton>
+    </div>
+  </header>)
+}
+
+function Hero(){
+  return(<section className="relative">
+    <div className="max-w-[1100px] mx-auto px-4 md:px-6 py-14 md:py-20 grid md:grid-cols-2 gap-10 items-center">
+      <Reveal>
         <div>
-          <div className="text-xs uppercase tracking-wide text-slate-500">Próximo pozo</div>
-          <div className="mt-1 text-lg font-semibold text-slate-900">
-            {new Date(props.dateISO).toLocaleString('es-ES', {
-              weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
-            })}
-          </div>
-          <div className="mt-1 text-sm text-slate-600">{props.lugar}</div>
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600">
-            {props.precio && <span className="rounded-full bg-white/70 px-2 py-1 border border-slate-200">{props.precio}</span>}
-            {props.plazas && <span className="rounded-full bg-white/70 px-2 py-1 border border-slate-200">{props.plazas}</span>}
+          <h1 className="text-4xl font-bold">Torneos tipo <span className="bg-gradient-to-r from-cyan-500 to-violet-500 bg-clip-text text-transparent">POZO</span></h1>
+          <p className="mt-4 text-slate-600">Organizamos pozos rápidos y divertidos. Inscríbete y consulta perfiles de jugadores.</p>
+          <div className="mt-6 flex gap-3">
+            <MagneticButton href={FORM_URL}>Abrir formulario</MagneticButton>
+            <a href="#jugadores" className="rounded-2xl border px-4 py-2 text-sm">Ver jugadores</a>
           </div>
         </div>
-        <MagneticButton href={props.formUrl} target="_blank" className="bg-cyan-500 hover:bg-cyan-600">
-          Inscribirme
-        </MagneticButton>
+      </Reveal>
+      <Reveal delay={100}>
+        <div className="relative rounded-3xl h-56 md:h-72 overflow-hidden border shadow-inner">
+          <ParticleField/>
+          <img src={`${import.meta.env.BASE_URL}carteles/pozo1.png`} className="absolute inset-0 w-full h-full object-cover opacity-40"/>
+        </div>
+      </Reveal>
+    </div>
+  </section>)
+}
+
+function Inscripcion(){return(
+  <section id="inscripcion" className="border-t border-slate-200 py-12">
+    <div className="max-w-[1100px] mx-auto px-4"><h2 className="text-xl font-semibold">Inscripción</h2>
+    <a href={FORM_URL} target="_blank" className="mt-4 inline-block bg-cyan-500 text-white px-4 py-2 rounded-xl">Abrir formulario</a></div>
+  </section>)}
+
+function Redes(){return(
+  <section id="redes" className="border-t border-slate-200 py-12">
+    <div className="max-w-[1100px] mx-auto px-4"><h2 className="text-xl font-semibold">Redes</h2>
+    <a href={IG_URL} target="_blank" className="mt-4 inline-block border px-4 py-2 rounded-xl">Instagram</a></div>
+  </section>)}
+
+function Galeria(){return(
+  <section id="galeria" className="border-t border-slate-200 py-12">
+    <div className="max-w-[1100px] mx-auto px-4"><h2 className="text-xl font-semibold">Galería</h2>
+    <div className="mt-6 grid grid-cols-2 md:grid-cols-3 gap-3">
+      {GALLERY.map((g,i)=><a key={i} href={g.src} target="_blank" className="block rounded-2xl overflow-hidden border">
+        <img src={g.src} alt={g.alt} className="w-full h-40 object-cover"/></a>)}
+    </div></div>
+  </section>)}
+
+function Leaderboard(){
+  const rows=useLeaderboard(),max=Math.max(1,...rows.map(r=>r.points))
+  return(<section id="ranking" className="border-t border-slate-200 py-12">
+    <div className="max-w-[1100px] mx-auto px-4">
+      <h2 className="text-xl font-semibold">Ranking</h2>
+      <div className="mt-6 space-y-3">{rows.map((r,i)=>
+        <div key={r.id} className="p-3 border rounded-xl flex items-center gap-3">
+          <div className="w-6 text-slate-500">#{i+1}</div>
+          <img src={resolvePhoto(r.photo)||'https://i.pravatar.cc/100'} className="w-9 h-9 rounded-full"/>
+          <div className="flex-1">
+            <div className="flex justify-between text-sm"><span>{r.name}</span><span>{r.points} pts</span></div>
+            <div className="h-2 bg-slate-100 rounded-full mt-1"><div className="h-full bg-cyan-500 rounded-full" style={{width:`${(r.points/max)*100}%`}}/></div>
+          </div>
+        </div>)}
+      {!rows.length&&<p className="text-sm text-slate-500">Cargando ranking…</p>}
       </div>
     </div>
-  )
+  </section>)
 }
 
-function Hero() {
-  return (
-    <section className="relative">
-      <ParallaxDecor />
-      <div className="mx-auto max-w-[1100px] px-4 md:px-6 py-14 md:py-20">
-        <div className="grid md:grid-cols-2 gap-10 items-center">
-          <Reveal>
-            <div>
-              <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-slate-900">
-                Torneos tipo{' '}
-                <span className="bg-gradient-to-r from-cyan-500 to-violet-500 bg-clip-text text-transparent">
-                  POZO
-                </span>
-                <br /> rápidos, justos y divertidos
-              </h1>
-              <p className="mt-4 text-slate-600">
-                Organizamos pozos de ~2h en instalaciones municipales. Inscríbete, ve fotos y consulta perfiles de jugadores.
-              </p>
-              <div className="mt-6 flex flex-wrap gap-3">
-                <MagneticButton href={FORM_URL} target="_blank">Abrir formulario</MagneticButton>
-                <a href="#jugadores" className="rounded-2xl border border-slate-300 px-5 py-2.5 text-sm hover:bg-slate-50 transition">
-                  Ver jugadores
-                </a>
-              </div>
-            </div>
-          </Reveal>
-
-          <Reveal delay={120}>
-            <NextPozoCard
-              dateISO="2025-09-15T10:00:00"
-              lugar="Polideportivo Municipal"
-              precio="12€ por jugador"
-              plazas="16 plazas"
-              formUrl={FORM_URL}
-              bgImageUrl={`${import.meta.env.BASE_URL}carteles/pozo1.png`}
-            />
-          </Reveal>
-        </div>
+function Jugadores({players}:{players:Player[]}){
+  const[q,setQ]=React.useState('')
+  const list=React.useMemo(()=>{const t=q.toLowerCase();return!t?players:players.filter(p=>p.name.toLowerCase().includes(t)||(p.level||'').toLowerCase().includes(t))},[q,players])
+  return(<section id="jugadores" className="border-t border-slate-200 py-12">
+    <div className="max-w-[1100px] mx-auto px-4">
+      <div className="flex justify-between items-end">
+        <h2 className="text-xl font-semibold">Jugadores</h2>
+        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar…" className="border px-2 py-1 rounded"/>
       </div>
-    </section>
-  )
+      <div className="mt-6 grid sm:grid-cols-2 md:grid-cols-3 gap-4">{list.map(p=>
+        <div key={p.id} className="p-4 border rounded-2xl flex gap-3 items-center hover:shadow-lg transition">
+          <img src={resolvePhoto(p.photo)||'https://i.pravatar.cc/100'} className="w-14 h-14 rounded-full"/>
+          <div><div className="font-medium">{p.name}</div><div className="text-xs text-slate-500">{p.level}</div></div>
+        </div>)}</div>
+    </div>
+  </section>)
 }
 
-function Inscripcion() {
-  return (
-    <section id="inscripcion" className="border-t border-slate-200">
-      <div className="mx-auto max-w-[1100px] px-4 md:px-6 py-12">
-        <Reveal>
-          <h2 className="text-xl font-semibold text-slate-900">Inscripción</h2>
-          <p className="text-slate-600 mt-2">Completa el formulario para confirmar tu plaza.</p>
-          <a
-            href={FORM_URL}
-            target="_blank"
-            className="mt-4 inline-block rounded-xl bg-cyan-500 text-white px-5 py-2.5 text-sm hover:bg-cyan-600 transition"
-          >
-            Abrir formulario
-          </a>
-        </Reveal>
-      </div>
-    </section>
-  )
-}
-
-function Redes() {
-  return (
-    <section id="redes" className="border-t border-slate-200">
-      <div className="mx-auto max-w-[1100px] px-4 md:px-6 py-12">
-        <Reveal>
-          <h2 className="text-xl font-semibold text-slate-900">Redes</h2>
-          <p className="text-slate-600 mt-2">Síguenos y etiqueta tus fotos del pozo 😊</p>
-          <a
-            href={IG_URL}
-            target="_blank"
-            className="mt-4 inline-block rounded-xl border border-slate-300 px-5 py-2.5 text-sm hover:bg-slate-50 transition"
-          >
-            Instagram
-          </a>
-        </Reveal>
-      </div>
-    </section>
-  )
-}
-
-function Galeria() {
-  return (
-    <section id="galeria" className="border-t border-slate-200">
-      <div className="mx-auto max-w-[1100px] px-4 md:px-6 py-12">
-        <Reveal><h2 className="text-xl font-semibold text-slate-900">Galería</h2></Reveal>
-        <Reveal delay={80}><p className="text-slate-600 mt-2">Las mejores fotos de torneos anteriores.</p></Reveal>
-        <div className="mt-6 grid grid-cols-2 md:grid-cols-3 gap-3">
-          {GALLERY.map((g, i) => (
-            <Reveal key={i} delay={i * 60}>
-              <a
-                href={g.src}
-                target="_blank"
-                className="group block rounded-2xl overflow-hidden border border-slate-200"
-              >
-                <img
-                  src={g.src}
-                  alt={g.alt}
-                  loading="lazy"
-                  className="w-full h-40 md:h-48 object-cover group-hover:scale-[1.02] transition"
-                />
-              </a>
-            </Reveal>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function Jugadores({ players }: { players: Player[] }) {
-  const [q, setQ] = React.useState('')
-  const list = React.useMemo(() => {
-    const t = q.trim().toLowerCase()
-    if (!t) return players
-    return players.filter(
-      (p) =>
-        p.name.toLowerCase().includes(t) ||
-        (p.level || '').toLowerCase().includes(t) ||
-        (p.club || '').toLowerCase().includes(t),
-    )
-  }, [q, players])
-
-  return (
-    <section id="jugadores" className="border-t border-slate-200">
-      <div className="mx-auto max-w-[1100px] px-4 md:px-6 py-12">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-semibold text-slate-900">Jugadores</h2>
-            <p className="text-slate-600 mt-2">Busca por nombre, nivel o club.</p>
-          </div>
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar…"
-            className="w-48 md:w-64 rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-cyan-400"
-          />
-        </div>
-
-        <div className="mt-6 grid sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {list.map((p, i) => (
-            <Reveal key={p.id} delay={i * 40}>
-              <div className="rounded-2xl border border-slate-200 p-4 flex gap-3 items-center">
-                <img
-                  src={resolvePhoto(p.photo) || 'https://i.pravatar.cc/100'}
-                  alt={p.name}
-                  className="w-14 h-14 rounded-full object-cover"
-                />
-                <div className="min-w-0">
-                  <div className="font-medium text-slate-900 truncate">{p.name}</div>
-                  <div className="text-xs text-slate-500 truncate">
-                    {p.level}{p.club ? ` · ${p.club}` : ''}
-                  </div>
-                  {p.ig && (
-                    <a
-                      href={`https://instagram.com/${p.ig.replace('@', '')}`}
-                      target="_blank"
-                      className="text-xs text-cyan-600 hover:underline"
-                    >
-                      {p.ig}
-                    </a>
-                  )}
-                </div>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function Footer() {
-  return (
-    <footer className="border-t border-slate-200">
-      <div className="mx-auto max-w-[1100px] px-4 md:px-6 py-10 text-xs text-slate-500">
-        © {new Date().getFullYear()} J &amp; S Padel — Pozo.
-      </div>
-    </footer>
-  )
-}
+function Footer(){return(<footer className="border-t border-slate-200 py-10 text-center text-xs text-slate-500">© {new Date().getFullYear()} J & S Padel</footer>)}
 
 /* ─────────────────────────────────────────────────────────
    App
    ───────────────────────────────────────────────────────── */
-export default function App() {
-  const players = usePlayers()
-  return (
-    <div className="bg-white text-slate-900">
-      <ScrollProgress />
-      <SectionConfetti targetId="jugadores" />
-      <Nav />
-      <Hero />
-      <Inscripcion />
-      <Redes />
-      <Galeria />
-      <Jugadores players={players} />
-      <Footer />
-    </div>
-  )
+export default function App(){
+  const players=usePlayers()
+  return(<div className="bg-white text-slate-900">
+    <ScrollProgress/>
+    <SectionConfetti targetId="jugadores"/>
+    <Nav/>
+    <Hero/>
+    <Inscripcion/>
+    <Redes/>
+    <Galeria/>
+    <Leaderboard/>
+    <Jugadores players={players}/>
+    <Footer/>
+  </div>)
 }
