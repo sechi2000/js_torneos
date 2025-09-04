@@ -2,7 +2,33 @@ import React from 'react'
 import { fetchCSV } from './utils/csv'
 
 /* ─────────────────────────────────────────────────────────
-   Helpers visuales (barra de progreso, reveal en scroll)
+   Fondo con gradiente animado (ultra-ligero)
+   ───────────────────────────────────────────────────────── */
+function AnimatedGradientBackground() {
+  return (
+    <>
+      <style>{`
+        @keyframes jellyGradient {
+          0%   { transform: translate3d(0,0,0) scale(1);   filter: hue-rotate(0deg); }
+          50%  { transform: translate3d(0,-2%,0) scale(1.04); filter: hue-rotate(40deg); }
+          100% { transform: translate3d(0,0,0) scale(1);   filter: hue-rotate(0deg); }
+        }
+      `}</style>
+      <div
+        aria-hidden
+        className="fixed inset-0 -z-10 opacity-[0.45]"
+        style={{
+          background:
+            'radial-gradient(55% 60% at 10% 10%, rgba(59,130,246,.35) 0%, rgba(59,130,246,0) 60%), radial-gradient(60% 55% at 90% 15%, rgba(14,165,233,.35) 0%, rgba(14,165,233,0) 60%), radial-gradient(70% 60% at 50% 85%, rgba(167,139,250,.35) 0%, rgba(167,139,250,0) 60%)',
+          animation: 'jellyGradient 16s ease-in-out infinite',
+        }}
+      />
+    </>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────
+   Barra de progreso + reveal
    ───────────────────────────────────────────────────────── */
 function ScrollProgress() {
   const [p, setP] = React.useState(0)
@@ -55,7 +81,7 @@ function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
 }
 
 /* ─────────────────────────────────────────────────────────
-   Partículas (suave) y Confetti controlado
+   Partículas suaves + Confetti controlado
    ───────────────────────────────────────────────────────── */
 function ParticleField() {
   const ref = React.useRef<HTMLCanvasElement>(null)
@@ -85,7 +111,7 @@ function ParticleField() {
         if (p.y < 0 || p.y > h) p.vy *= -1
         ctx.beginPath()
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
-        ctx.fillStyle = 'rgba(14,165,233,0.6)'
+        ctx.fillStyle = 'rgba(14,165,233,0.55)'
         ctx.fill()
       }
       raf = requestAnimationFrame(loop)
@@ -97,7 +123,7 @@ function ParticleField() {
       window.removeEventListener('resize', onResize)
     }
   }, [])
-  return <canvas ref={ref} className="absolute inset-0 w-full h-full opacity-40" />
+  return <canvas ref={ref} className="absolute inset-0 w-full h-full opacity-35" />
 }
 
 function SectionConfetti({
@@ -189,7 +215,7 @@ function SectionConfetti({
 }
 
 /* ─────────────────────────────────────────────────────────
-   Tipos y configuración
+   Tipos / Config
    ───────────────────────────────────────────────────────── */
 type Player = { id: string; name: string; level: string; club?: string; ig?: string; photo?: string }
 type LBRow = { id: string; name: string; points: number; wins: number; ig?: string; photo?: string }
@@ -202,7 +228,7 @@ const GALLERY: { src: string; alt: string }[] = [
 ]
 
 /* ─────────────────────────────────────────────────────────
-   Utilidades datos
+   Data utils
    ───────────────────────────────────────────────────────── */
 function resolvePhoto(url?: string) {
   if (!url) return ''
@@ -227,7 +253,7 @@ function usePlayers() {
             photo: r.photo || '',
           }))
         )
-      } catch (e) {
+      } catch {
         setP([])
       }
     })()
@@ -251,7 +277,7 @@ function useLeaderboard() {
         }))
         m.sort((a, b) => b.points - a.points)
         setR(m)
-      } catch (e) {
+      } catch {
         setR([])
       }
     })()
@@ -260,7 +286,7 @@ function useLeaderboard() {
 }
 
 /* ─────────────────────────────────────────────────────────
-   Cuenta atrás + Tarjeta Próximo Pozo
+   Cuenta atrás + Próximo Pozo
    ───────────────────────────────────────────────────────── */
 function useCountdown(targetISO: string) {
   const target = React.useMemo(() => new Date(targetISO).getTime(), [targetISO])
@@ -287,7 +313,7 @@ function NextPozoCard(props: {
 }) {
   const c = useCountdown(props.dateISO)
   return (
-    <div className="relative rounded-3xl h-56 md:h-72 overflow-hidden border border-slate-200 shadow-inner bg-gradient-to-br from-cyan-50 to-violet-50">
+    <div className="relative rounded-3xl h-56 md:h-72 overflow-hidden border border-slate-200 shadow-inner bg-gradient-to-br from-white/70 to-white/30">
       {props.bgImageUrl && (
         <img
           src={props.bgImageUrl}
@@ -311,14 +337,10 @@ function NextPozoCard(props: {
           <div className="mt-1 text-sm text-slate-600">{props.lugar}</div>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600">
             {props.precio && (
-              <span className="rounded-full bg-white/70 px-2 py-1 border border-slate-200">
-                💶 {props.precio}
-              </span>
+              <span className="rounded-full bg-white/80 px-2 py-1 border border-slate-200">💶 {props.precio}</span>
             )}
             {props.plazas && (
-              <span className="rounded-full bg-white/70 px-2 py-1 border border-slate-200">
-                👥 {props.plazas}
-              </span>
+              <span className="rounded-full bg-white/80 px-2 py-1 border border-slate-200">👥 {props.plazas}</span>
             )}
           </div>
         </div>
@@ -328,8 +350,8 @@ function NextPozoCard(props: {
               <span className="text-emerald-600">¡En juego!</span>
             ) : (
               <span>
-                {String(c.d).padStart(2, '0')}d:{String(c.h).padStart(2, '0')}h:{String(c.m).padStart(2, '0')}m:
-                {String(c.s).padStart(2, '0')}s
+                {String(c.d).padStart(2, '0')}d:{String(c.h).padStart(2, '0')}h:
+                {String(c.m).padStart(2, '0')}m:{String(c.s).padStart(2, '0')}s
               </span>
             )}
           </div>
@@ -347,7 +369,7 @@ function NextPozoCard(props: {
 }
 
 /* ─────────────────────────────────────────────────────────
-   UI secciones
+   UI: Nav / Botón magnético
    ───────────────────────────────────────────────────────── */
 function MagneticButton({ href, children }: { href: string; children: React.ReactNode }) {
   const ref = React.useRef<HTMLAnchorElement>(null)
@@ -372,7 +394,7 @@ function MagneticButton({ href, children }: { href: string; children: React.Reac
       ref={ref}
       href={href}
       target="_blank"
-      className="rounded-2xl bg-cyan-500 px-4 py-2 text-white hover:bg-cyan-600 transition"
+      className="rounded-2xl bg-cyan-500 px-4 py-2 text-white hover:bg-cyan-600 transition will-change-transform"
     >
       {children}
     </a>
@@ -383,9 +405,7 @@ function Nav() {
   return (
     <header className="sticky top-0 z-40 bg-white/70 backdrop-blur border-b border-slate-200">
       <div className="max-w-[1100px] mx-auto px-4 md:px-6 h-14 flex justify-between items-center">
-        <a href="#" className="font-bold">
-          J &amp; S Padel
-        </a>
+        <a href="#" className="font-bold">J &amp; S Padel</a>
         <nav className="hidden md:flex gap-6 text-sm">
           <a href="#inscripcion">Inscripción</a>
           <a href="#redes">Redes</a>
@@ -399,6 +419,9 @@ function Nav() {
   )
 }
 
+/* ─────────────────────────────────────────────────────────
+   Hero
+   ───────────────────────────────────────────────────────── */
 function Hero() {
   return (
     <section className="relative">
@@ -417,7 +440,10 @@ function Hero() {
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <MagneticButton href={FORM_URL}>Abrir formulario</MagneticButton>
-              <a href="#jugadores" className="rounded-2xl border border-slate-300 px-5 py-2.5 text-sm hover:bg-slate-50 transition">
+              <a
+                href="#jugadores"
+                className="rounded-2xl border border-slate-300 px-5 py-2.5 text-sm hover:bg-slate-50 transition"
+              >
                 Ver jugadores
               </a>
             </div>
@@ -442,6 +468,9 @@ function Hero() {
   )
 }
 
+/* ─────────────────────────────────────────────────────────
+   Secciones
+   ───────────────────────────────────────────────────────── */
 function Inscripcion() {
   return (
     <section id="inscripcion" className="border-t border-slate-200">
@@ -486,18 +515,8 @@ function Galeria() {
         <p className="text-slate-600 mt-2">Las mejores fotos de torneos anteriores.</p>
         <div className="mt-6 grid grid-cols-2 md:grid-cols-3 gap-3">
           {GALLERY.map((g, i) => (
-            <a
-              key={i}
-              href={g.src}
-              target="_blank"
-              className="group block rounded-2xl overflow-hidden border border-slate-200"
-            >
-              <img
-                src={g.src}
-                alt={g.alt}
-                loading="lazy"
-                className="w-full h-40 md:h-48 object-cover group-hover:scale-[1.02] transition"
-              />
+            <a key={i} href={g.src} target="_blank" className="group block rounded-2xl overflow-hidden border border-slate-200">
+              <img src={g.src} alt={g.alt} loading="lazy" className="w-full h-40 md:h-48 object-cover group-hover:scale-[1.02] transition" />
             </a>
           ))}
         </div>
@@ -506,35 +525,57 @@ function Galeria() {
   )
 }
 
+/* ─────────────────────────────────────────────────────────
+   Ranking (con medallas)
+   ───────────────────────────────────────────────────────── */
+function Medal({ place }: { place: number }) {
+  if (place === 1) return <span className="text-2xl drop-shadow-sm">🥇</span>
+  if (place === 2) return <span className="text-2xl drop-shadow-sm">🥈</span>
+  if (place === 3) return <span className="text-2xl drop-shadow-sm">🥉</span>
+  return null
+}
+
 function Leaderboard() {
   const rows = useLeaderboard()
   const max = Math.max(1, ...rows.map((r) => r.points))
+
   return (
     <section id="ranking" className="border-t border-slate-200">
       <div className="mx-auto max-w-[1100px] px-4 md:px-6 py-12">
         <h2 className="text-xl font-semibold text-slate-900">Ranking</h2>
         <div className="mt-6 space-y-3">
-          {rows.map((r, i) => (
-            <div key={r.id} className="p-3 border rounded-xl flex items-center gap-3">
-              <div className="w-6 text-slate-500">#{i + 1}</div>
-              <img
-                src={resolvePhoto(r.photo) || 'https://i.pravatar.cc/100'}
-                className="w-9 h-9 rounded-full"
-              />
-              <div className="flex-1">
-                <div className="flex justify-between text-sm">
-                  <span>{r.name}</span>
-                  <span>{r.points} pts</span>
+          {rows.map((r, i) => {
+            const top = i < 3
+            return (
+              <div
+                key={r.id}
+                className={`p-3 border rounded-xl flex items-center gap-3 ${
+                  top ? 'border-amber-300/60 bg-amber-50/30' : ''
+                }`}
+                style={top ? { boxShadow: '0 0 0 2px rgba(251,191,36,.25) inset' } : undefined}
+              >
+                <div className="w-7 text-slate-500 flex items-center justify-center">
+                  <Medal place={i + 1} />
                 </div>
-                <div className="h-2 bg-slate-100 rounded-full mt-1">
-                  <div
-                    className="h-full bg-cyan-500 rounded-full"
-                    style={{ width: `${(r.points / max) * 100}%` }}
-                  />
+                <img
+                  src={resolvePhoto(r.photo) || 'https://i.pravatar.cc/100'}
+                  className={`w-10 h-10 rounded-full ${top ? 'ring-2 ring-amber-300' : ''}`}
+                />
+                <div className="flex-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="font-medium">{r.name}</span>
+                    <span className="tabular-nums">{r.points} pts</span>
+                  </div>
+                  <div className="h-2 bg-slate-100 rounded-full mt-1 overflow-hidden">
+                    <div
+                      className={`h-full ${top ? 'bg-amber-400' : 'bg-cyan-500'} rounded-full`}
+                      style={{ width: `${(r.points / max) * 100}%` }}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
           {!rows.length && <p className="text-sm text-slate-500">Cargando ranking…</p>}
         </div>
       </div>
@@ -542,6 +583,41 @@ function Leaderboard() {
   )
 }
 
+/* ─────────────────────────────────────────────────────────
+   TiltCard para hover 3D en las tarjetas de jugador
+   ───────────────────────────────────────────────────────── */
+function TiltCard({ children }: { children: React.ReactNode }) {
+  const ref = React.useRef<HTMLDivElement>(null)
+  React.useEffect(() => {
+    const el = ref.current!
+    const onMove = (e: MouseEvent) => {
+      const r = el.getBoundingClientRect()
+      const x = (e.clientX - (r.left + r.width / 2)) / r.width
+      const y = (e.clientY - (r.top + r.height / 2)) / r.height
+      el.style.transform = `rotateY(${x * 6}deg) rotateX(${-y * 6}deg) translateZ(0)`
+    }
+    const onLeave = () => (el.style.transform = 'rotateY(0deg) rotateX(0deg)')
+    el.addEventListener('mousemove', onMove)
+    el.addEventListener('mouseleave', onLeave)
+    return () => {
+      el.removeEventListener('mousemove', onMove)
+      el.removeEventListener('mouseleave', onLeave)
+    }
+  }, [])
+  return (
+    <div
+      ref={ref}
+      className="transition-transform duration-150 will-change-transform hover:shadow-xl"
+      style={{ transformStyle: 'preserve-3d' }}
+    >
+      {children}
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────
+   Jugadores
+   ───────────────────────────────────────────────────────── */
 function Jugadores({ players }: { players: Player[] }) {
   const [q, setQ] = React.useState('')
   const list = React.useMemo(() => {
@@ -573,32 +649,32 @@ function Jugadores({ players }: { players: Player[] }) {
 
         <div className="mt-6 grid sm:grid-cols-2 md:grid-cols-3 gap-4">
           {list.map((p) => (
-            <div
-              key={p.id}
-              className="rounded-2xl border border-slate-200 p-4 flex gap-3 items-center hover:shadow-lg transition"
-            >
-              <img
-                src={resolvePhoto(p.photo) || 'https://i.pravatar.cc/100'}
-                alt={p.name}
-                className="w-14 h-14 rounded-full object-cover"
-              />
-              <div className="min-w-0">
-                <div className="font-medium text-slate-900 truncate">{p.name}</div>
-                <div className="text-xs text-slate-500 truncate">
-                  {p.level}
-                  {p.club ? ` · ${p.club}` : ''}
+            <TiltCard key={p.id}>
+              <div className="rounded-2xl border border-slate-200 p-4 flex gap-3 items-center bg-white">
+                <img
+                  src={resolvePhoto(p.photo) || 'https://i.pravatar.cc/100'}
+                  alt={p.name}
+                  className="w-14 h-14 rounded-full object-cover"
+                  style={{ transform: 'translateZ(12px)' }}
+                />
+                <div className="min-w-0" style={{ transform: 'translateZ(10px)' }}>
+                  <div className="font-medium text-slate-900 truncate">{p.name}</div>
+                  <div className="text-xs text-slate-500 truncate">
+                    {p.level}
+                    {p.club ? ` · ${p.club}` : ''}
+                  </div>
+                  {p.ig && (
+                    <a
+                      href={`https://instagram.com/${p.ig.replace('@', '')}`}
+                      target="_blank"
+                      className="text-xs text-cyan-600 hover:underline"
+                    >
+                      {p.ig}
+                    </a>
+                  )}
                 </div>
-                {p.ig && (
-                  <a
-                    href={`https://instagram.com/${p.ig.replace('@', '')}`}
-                    target="_blank"
-                    className="text-xs text-cyan-600 hover:underline"
-                  >
-                    {p.ig}
-                  </a>
-                )}
               </div>
-            </div>
+            </TiltCard>
           ))}
         </div>
       </div>
@@ -623,6 +699,7 @@ export default function App() {
   const players = usePlayers()
   return (
     <div className="bg-white text-slate-900">
+      <AnimatedGradientBackground />
       <ScrollProgress />
       <SectionConfetti targetId="jugadores" />
       <Nav />
